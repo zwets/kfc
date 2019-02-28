@@ -1,0 +1,9 @@
+/src/kfc
+/src/unit-test/run-all-tests
+*.o
+*.a
+a.out
+*.bin
+.project
+.cproject
+.settings

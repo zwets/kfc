@@ -34,8 +34,6 @@ USER_HEADERS = \
 	$(USER_DIR)/utils.h
 
 USER_OBJS = \
-	kmercodec.o \
-	tallyman.o \
 	seqreader.o \
 	utils.o
 

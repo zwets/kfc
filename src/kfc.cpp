@@ -83,8 +83,8 @@ int main (int, char *argv[])
         {
             char opt = (*argv)[1];
 
-            if (opt == '-') {      // double dash marks end of options
-                ++argv;
+            if (opt == '-' && (*argv)[2] == '\0') {
+                ++argv;            // double dash marks end of options
                 break;
             }
             else if (opt == 'v') {

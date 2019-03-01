@@ -42,15 +42,45 @@ GitHub, here are the steps to run it:
       # kfc has self-contained usage instructions
       kfc --help
 
-      # Example: codon count (with merged reverse complements)
+      # Example: codon count (canonical, ignoring strandedness)
       kfc -k 3 src/unit-test/data/test.fa.gz
 
-      # Example: codon count (not merging reverse complements)
+      # Example: codon count (single stranded)
       kfc -k 3 -s src/unit-test/data/test.fa.gz
+
+
+## FAQ
+
+#### What are canonical k-mers?
+
+By default, `kfc` treats k-mers and their reverse complement as the same k-mer.
+For instance, if 3-mers `tgc` and `gca` both occur in the input, then they are
+reported as two occurrences of the 3-mer `gca`.
+
+This makes sense, as seeing either implies the presence of the other (unless
+we're explicitly dealing with single-stranded DNA):
+
+
+    <--cgt---           <--acg---
+       |||     is just     |||     from a funny angle
+    ---gca-->           ---tgc-->
+
+
+Clearly, `tgc` and `gca` refer to the same _base pair sequence_, and the choice
+to name this either `gca` or `tgc` is arbitrary.  `kfc` simply picks whichever
+of the two has *a* or *c* as its middle base, and calls this the _'canonical'_
+kmer.  (Note: the requirement that k be odd guarantees that there ís a middle
+base!)
+
+
+#### What are k-mer numbers?
+
+`kfc` encodes each k-mer as an integral number.  @@TODO@@
+
 
 ---
 
-#### License
+#### Licence
 
 kfc - k-mer frequency counter
 Copyright (C) 2019  Marco van Zwetselaar <io@zwets.it>

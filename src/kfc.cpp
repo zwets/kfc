@@ -19,17 +19,14 @@
 #include <stdexcept>
 #include <fstream>
 #include <iostream>
-//#include <memory>
 #include <string>
-//#include <cstring>
-//#include <cstdlib>
-//#include <cstdio>
 
 #include "kmercounter.h"
 #include "seqreader.h"
 #include "utils.h"
 
 using namespace kfc;
+
 
 static const int DEFAULT_KSIZE = 15;
 static const int MAX_KSIZE = 32;
@@ -46,7 +43,7 @@ static const char USAGE[] = "\n"
 "   -t NUM    use NUM threads (default: all system threads)\n"
 "   -v        produce verbose output to stderr\n"
 "\n"
-"  Each FILE can be an optionally compressed FASTA, FASTQ, or plain DNA file.\n"
+"  Each FILE can be an (optionally gzipped) FASTA, FASTQ, or plain DNA file.\n"
 "  If FILE is omitted or '-', it is read from stdin\n"
 "\n"
 "  Only k-mers consisting of proper bases (acgtACGT) are counted.  All k-mers\n"
@@ -54,10 +51,10 @@ static const char USAGE[] = "\n"
 "\n"
 "  Unless option -s is present, a k-mer and its reverse complement are counted\n"
 "  as two occurrences of the same k-mer, whose canonical form is whichever of\n"
-"  the two has A or C as its middle base (note that KSIZE must be odd).\n"
+"  the two has A or C as its middle base.\n"
 "\n"
 "  If option -s is present, then k-mers are output as they occur in the input,\n"
-"  and KSIZE may be odd or even.\n"
+"  reverse complements are counted separately, and KSIZE may be odd or even.\n"
 "\n"
 "  More information: http://io.zwets.it/kfc.\n"
 "\n";
@@ -118,7 +115,7 @@ int main (int, char *argv[])
 
             // Create the kmer_counter
 
-        kmer_counter counter(ksize, single_strand, max_mem, n_threads);
+        std::unique_ptr<kmer_counter_F> counter(kmer_counter_F::create(ksize, single_strand, max_mem, n_threads));
 
             // Iterate over files
 
@@ -141,7 +138,7 @@ int main (int, char *argv[])
             sequence seq;
 
             while (reader.next(seq))
-                counter.process(seq.data);
+                counter->process(seq.data);
 
             in_file.close();
 
@@ -151,30 +148,7 @@ int main (int, char *argv[])
 
             // Output kmer_counter results
 
-        const tallyman *tallyman = counter.get_tallyman();
-
-        std::cout << "invalid" << '\t' << tallyman->invalid_count();
-
-        if (tallyman->is_vec()) {
-            const kfc::count_t *p0 = tallyman->get_results_vec().get();
-            const kfc::count_t *p1 = p0 + tallyman->max_value() + 1;
-            const kfc::count_t *p = p0 - 1;
-            while (++p != p1)
-                if (*p)
-                    std::cout << *p << '\t' << p - p0 << std::endl;
-        }
-        else if (tallyman->is_map32()) {
-            std::map<tallyman::val32_t,kfc::count_t>::const_iterator p0 = tallyman->get_results_map32().begin();
-            std::map<tallyman::val32_t,kfc::count_t>::const_iterator p1 = tallyman->get_results_map32().end();
-            for (std::map<tallyman::val32_t,kfc::count_t>::const_iterator p = p0; p != p1; ++p)
-                std::cout << p->first << '\t' << p->second << std::endl;
-        }
-        else { // is_map64 
-            std::map<tallyman::val64_t,kfc::count_t>::const_iterator p0 = tallyman->get_results_map64().begin();
-            std::map<tallyman::val64_t,kfc::count_t>::const_iterator p1 = tallyman->get_results_map64().end();
-            for (std::map<tallyman::val64_t,kfc::count_t>::const_iterator p = p0; p != p1; ++p)
-                std::cout << p->first << '\t' << p->second << std::endl;
-        }
+        counter->write_results(std::cout);
 
     }
     catch (std::runtime_error e) {

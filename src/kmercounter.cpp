@@ -18,22 +18,4 @@
 
 #include "kmercounter.h"
 
-
-namespace kfc {
-
-
-kmer_counter::kmer_counter(int ksize, bool s_strand, int mem_gb, int n_threads)
-    : ksize_(ksize), s_strand_(s_strand), n_threads_(n_threads)
-{
-    tallyman_ = tallyman::create(2 * ksize + (s_strand ? 1 : 0), mem_gb);
-}
-
-//void
-//kmer_counter::process(std::string data)
-//{
-//}
-
-
-} // namespace kfc
-
 // vim: sts=4:sw=4:ai:si:et

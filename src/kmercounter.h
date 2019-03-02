@@ -32,35 +32,47 @@ template <typename count_t> class kmer_counter;
 template <typename kmer_t, typename count_t> class kmer_counter_impl;
 
 
-// kmer_counter_{L,F,S} - convenience typedefs for kmer_counter with different
+// kmer_counter_{L,Q,S,D} - convenience typedefs for kmer_counter with different
 // count_t data types.  The count_t type tallies kmer hits, and must be small
-// to save on memory, but large enough to not overflow.  Pick as follows:
+// to save on memory, but large enough to not overflow.  It can be integral
+// or floating point, though the latter is likely to be slower.
+//
 // - L: if there could ever be more than 4G occurrences of a single kmer
-// - F: if you value speed at the cost of possible larger memory consumption
+// - Q: if you value speed at the cost of possible larger memory consumption
 // - S: if you value low memory consumption over possible faster speed
+// - D: if you want to try using a double for keeping count
 // 
 typedef kmer_counter<std::uint_fast64_t> kmer_counter_L;
-typedef kmer_counter<std::uint_fast32_t> kmer_counter_F;
+typedef kmer_counter<std::uint_fast32_t> kmer_counter_Q;
 typedef kmer_counter<std::uint32_t>      kmer_counter_S;
+typedef kmer_counter<double>             kmer_counter_D;
 
 
-// kmer_counter - counts kmers across a collection of sequences
+// kmer_counter
 //
 // Perform any number of calls to process(seq), then invoke write_results()
-// to write the detected kmers and their counts.
+// to output the detected kmers and their counts.
 //
-// This class wraps two implementations: one for ksize up to 15 (32-bits),
-// and one for ksize up to 31 (64-bits).  Its constructor instantiates the
-// appropriate implementation class.  This could not be done with virtual
-// functions, as the do not work here due to variant return types.
+// This class has two implementations: one for ksize up to 15 (32-bits),
+// and one for ksize up to 31 (64-bits).  The static create() factory method
+// produces the most memory-efficient implementation for the given ksize.
 //
-// Also, optimisations in the tallyman component in the implementation classes
-// mean that the tallied results can be of various different types.  Member
-// write_results() hides the consequent complexities.
+// Note that the 32-bit (memory-efficient) implementation may be slower
+// than the 64-bit implementation, so for small ksizes you may still want
+// to instantiate the 64-bit implementation, or let the compiler choose
+// the fastest implementation.  This is simply done by:
+//
+//     kmer_counter_impl<std::uint_fast32_t, std::uint_fast32_t> counter(...)
+//
+// The tallyman component in the implementation classes encapsulates further
+// optimisations for speed and memory consumption; see tallyman.h for details.
 //
 template <typename count_t>
 class kmer_counter
 {
+    static_assert(std::is_integral<count_t>::value || std::is_floating_point<count_t>::value,
+            "template argument count_t must be a numerical type");
+
     protected:
         int ksize_;
         bool s_strand_;
@@ -83,13 +95,19 @@ class kmer_counter
 
 // kmer_counter_impl ----------------------------------------------------------
 //
-// Implements kmer_counter for a given kmer_t, i.e. kmer size)
+// Implements kmer_counter for a given kmer_t.  You can instantiate this class
+// directly if you know your ksize ahead of time that ksize will not exceed kmer_codec<kmer_t>::max_ksize.
 
 template <typename kmer_t, typename count_t>
 class kmer_counter_impl : public kmer_counter<count_t>
 {
+    static_assert(std::is_unsigned<kmer_t>::value,
+            "template argument kmer_t must be unsigned integral");
+    static_assert(std::is_integral<count_t>::value || std::is_floating_point<count_t>::value,
+            "template argument count_t must be a numerical type");
+
     public:
-        constexpr static int max_ksize = 4*sizeof(kmer_t) - 1;
+        constexpr static int max_ksize = kmer_codec<kmer_t>::max_ksize;
 
     private:
         std::unique_ptr<tallyman<kmer_t,count_t> > tallyman_;

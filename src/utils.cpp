@@ -72,6 +72,9 @@ verbose_emit(const char *fmt, ...)
     }
 }
 
+// NOTE: get_system_memory may fail to compile on MacOS.
+// TODO: solve that issue with ifdefs
+//
 unsigned long long
 get_system_memory()
 {

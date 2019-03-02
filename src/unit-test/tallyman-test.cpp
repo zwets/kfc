@@ -30,18 +30,29 @@ typedef tallyman<std::uint32_t,std::uint32_t> tman3232;
 typedef tallyman<std::uint64_t,std::uint32_t> tman6432;
 typedef tallyman<std::uint32_t,std::uint64_t> tman3264;
 typedef tallyman<std::uint64_t,std::uint64_t> tman6464;
+typedef tallyman<std::uint32_t,double> tman32dd;
 
 typedef std::unique_ptr<tman3232> uptr3232;
 typedef std::unique_ptr<tman6432> uptr6432;
 typedef std::unique_ptr<tman3264> uptr3264;
 typedef std::unique_ptr<tman6464> uptr6464;
+typedef std::unique_ptr<tman32dd> uptr32dd;
 
 static uptr3232 create_uptr3232(int nbits, int max_gb = 0) {
     return uptr3232(tman3232::create(nbits, max_gb));
 }
+static uptr32dd create_uptr32dd(int nbits, int max_gb = 0) {
+    return uptr32dd(tman32dd::create(nbits, max_gb));
+}
 
 TEST(tallyman_test, no_bits_zero) {
     EXPECT_DEATH(create_uptr3232(0), ".*");
+}
+
+TEST(tallyman_test, double_counter) {
+    auto p = create_uptr32dd(4);
+    p->tally({0,1,1,2,2,2});
+    EXPECT_EQ(p->get_results_vec()[0],1.0);
 }
 
 /*

@@ -115,7 +115,7 @@ int main (int, char *argv[])
 
             // Create the kmer_counter
 
-        std::unique_ptr<kmer_counter_F> counter(kmer_counter_F::create(ksize, single_strand, max_mem, n_threads));
+        std::unique_ptr<kmer_counter_Q> counter(kmer_counter_Q::create(ksize, single_strand, max_mem, n_threads));
 
             // Iterate over files
 

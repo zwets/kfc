@@ -28,29 +28,42 @@
 namespace kfc {
 
 
-// tallyman - keeps counts of encoded kmers (or any integer type)
+// tallyman - keeps counts of encoded kmers, or generally of any
+//            unsigned integral type of a specified maximum number of bits
 //
-// Core operation is tally(n), which increments the count of integer n by 1,
-// or increments the invalid_count if n is larger than nbits can contain.
+// Tallyman has implementations with different space and time characteristics.
+// Given B=nbits the bit size of the items to be tallied, N the number of
+// values tallied, and C the size of count_t, then:
+// - tallyman_vec uses a linear array, with O(1) lookup and C*2^B memory;
+// - tallyman_map uses a map, with O(log N) lookup and O(N) storage
 //
-// This class has four implementations with different space and time
-// characteristics.  Given B the number of bits in the integers to be tallied,
-// N the number of integers tallied, and C the size of count_t,
-// - tallyman_vec uses a linear array with O(1) lookup and O(2^B) memory,
-//   with C contributing a factor 2 if its type is 64 rather than 32-bit
-// - tallyman_map uses a map of O(N) storage and O(log N) lookup, with C
-//   contributing additional 25-50% if it is 64-bit
+// The tallyman::create(nbits,max_gb) factory method returns the vector
+// implementation if it fits in max_gb memory, or else the map implementation.
 //
-// The tallyman::create() factory method picks the fastest implementation
-// that fits a given approximate memory limit.
+// The core operation is tally(items), which tallies each i in items by either
+// incrementing its item count, or incrementing the invalid_count if i exceeds
+// max_value, the largest possible nbit number.
+//
+// Template parameter value_t must be an unsigned integral type of at least
+// nbits bits (or an exception is thrown).  If its bit size equals nbits, then
+// by definition invalid_count will remain 0, as no item can exceed max_value.
+//
+// Template parameter count_t can be any numeric type, though integral types
+// will likely perform better than floating point.  It must be wide enough
+// to hold the maximum tally of any element (and of the invalid count).
+// Roll-over of integral types is silent; this is C++.
 //
 // The get_results_X() members return the tallied counts.  For performance
-// reasons, these members do not shield from the underlying implementation.
-// Use the is_vec() and is_map() selectors to find out which get_results_X()
-// is applicable to the actual class.
+// reasons, these members do not shield from the underlying implementation
+// (vector or map).  Use the is_vec() and is_map() selectors to find out
+// which get_results_X() is applicable to the actual class.
 //
 template <typename value_t, typename count_t>
 class tallyman {
+    static_assert(std::is_unsigned<value_t>::value, 
+            "template argument value_t must be an unsigned integral type");
+    static_assert(std::is_integral<count_t>::value || std::is_floating_point<count_t>::value, 
+            "template argument count_t must be a numerical type");
 
     protected:
         value_t max_value_;
@@ -79,6 +92,11 @@ class tallyman {
 template <typename value_t, typename count_t>
 class tallyman_vec : public tallyman<value_t,count_t>
 {
+    static_assert(std::is_unsigned<value_t>::value,
+            "template argument value_t must be unsigned integral");
+    static_assert(std::is_integral<count_t>::value || std::is_floating_point<count_t>::value, 
+            "template argument count_t must be a numerical type");
+
     private:
         std::unique_ptr<count_t[]> vec_;
 
@@ -100,6 +118,11 @@ class tallyman_vec : public tallyman<value_t,count_t>
 template<typename value_t, typename count_t>
 class tallyman_map : public tallyman<value_t,count_t>
 {
+    static_assert(std::is_unsigned<value_t>::value,
+            "template argument value_t must be unsigned integral");
+    static_assert(std::is_integral<count_t>::value || std::is_floating_point<count_t>::value, 
+            "template argument count_t must be a numerical type");
+
     private:
         typedef typename std::map<value_t,count_t>::iterator iterator;
         std::map<value_t,count_t> map_;

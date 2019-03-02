@@ -29,7 +29,10 @@ namespace {
 const unsigned A_VAL = 0, C_VAL = 1, G_VAL = 2, T_VAL = 3;
 
 typedef kmer_codec<std::uint32_t> kmer_codec32;
+static std::uint32_t invalid32 = kmer_codec<std::uint32_t>::invalid_kmer;
+
 typedef kmer_codec<std::uint64_t> kmer_codec64;
+static std::uint64_t invalid64 = kmer_codec<std::uint64_t>::invalid_kmer;
 
 TEST(kmercodec_test, no_ksize_zero) {
     EXPECT_DEATH(kmer_codec32(0), ".*");
@@ -126,12 +129,29 @@ TEST(kmercodec_test, ksize_3ss_cgt) {
 
 TEST(kmercodec_test, reverse_long) {
     kmer_codec32 c(7);
+    //char seq[] = "acgattagcgatagggt";
+    //char rev[] = "accctatcgctaatcgt";
+    std::string seq("acgattagcgatagggt");
+    std::string rev("accctatcgctaatcgt");
+
+    std::vector<std::uint32_t> r1 = c.encode(seq);
+    std::vector<std::uint32_t> r2 = c.encode(rev);
+
+    EXPECT_EQ(r1.size(), seq.size()-7+1);
+    EXPECT_EQ(r1.size(), r2.size());
+    for (size_t i = 0; i != r1.size(); ++i)
+        EXPECT_EQ(r1[i], r2[r2.size()-1-i]);
+}
+
+TEST(kmercodec_test, reverse_long_ss) {
+    kmer_codec32 c(7,true);
     char seq[] = "acgattagcgatagggt";
     char rev[] = "accctatcgctaatcgt";
 
     std::vector<std::uint32_t> r1 = c.encode(seq);
     std::vector<std::uint32_t> r2 = c.encode(rev);
 
+    EXPECT_EQ(r1.size(), sizeof(seq)-7);
     EXPECT_EQ(r1, r2);
 }
 
@@ -146,12 +166,12 @@ TEST(kmercodec_test, ksize_3) {
     EXPECT_EQ(28,r1[3]); // tca -> 11100
 }
 
-TEST(kmercodec_test, invalids) {
+TEST(kmercodec_test, invalid32) {
     kmer_codec32 c(3);
     char seq[] = "cgn";
     std::vector<std::uint32_t> r1 = c.encode(seq);
     EXPECT_EQ(r1.size(),1); // acg -> 00110
-    EXPECT_EQ(r1[0], kmer_codec32::invalid_kmer);
+    EXPECT_EQ(r1[0], invalid32);
 }
 
 #if 0

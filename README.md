@@ -43,10 +43,10 @@ GitHub, here are the steps to run it:
       kfc --help
 
       # Example: codon count (canonical, ignoring strandedness)
-      kfc -k 3 src/unit-test/data/test.fa.gz
+      kfc -k 3 src/unit-test/data/ecoli.fa.gz
 
       # Example: codon count (single stranded)
-      kfc -k 3 -s src/unit-test/data/test.fa.gz
+      kfc -k 3 -s src/unit-test/data/ecoli.fa.gz
 
 
 ## FAQ

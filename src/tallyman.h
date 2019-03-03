@@ -1,5 +1,5 @@
 /* tallyman.h
- * 
+ *
  * Copyright (C) 2019  Marco van Zwetselaar <io@zwets.it>
  *
  * This program is free software: you can redistribute it and/or modify
@@ -60,9 +60,9 @@ namespace kfc {
 //
 template <typename value_t, typename count_t>
 class tallyman {
-    static_assert(std::is_unsigned<value_t>::value, 
+    static_assert(std::is_unsigned<value_t>::value,
             "template argument value_t must be an unsigned integral type");
-    static_assert(std::is_integral<count_t>::value || std::is_floating_point<count_t>::value, 
+    static_assert(std::is_integral<count_t>::value || std::is_floating_point<count_t>::value,
             "template argument count_t must be a numerical type");
 
     protected:
@@ -83,7 +83,7 @@ class tallyman {
         virtual bool is_vec() const { return false; }
         virtual bool is_map() const { return false; }
 
-        virtual const std::unique_ptr<count_t[]>& get_results_vec() const = 0;
+        virtual const count_t *get_results_vec() const = 0;
         virtual const std::map<value_t,count_t>& get_results_map() const = 0;
 
         count_t invalid_count() { return n_invalid_; }
@@ -94,11 +94,11 @@ class tallyman_vec : public tallyman<value_t,count_t>
 {
     static_assert(std::is_unsigned<value_t>::value,
             "template argument value_t must be unsigned integral");
-    static_assert(std::is_integral<count_t>::value || std::is_floating_point<count_t>::value, 
+    static_assert(std::is_integral<count_t>::value || std::is_floating_point<count_t>::value,
             "template argument count_t must be a numerical type");
 
     private:
-        std::unique_ptr<count_t[]> vec_;
+        count_t *vec_;
 
         void tally(value_t i);
 
@@ -106,12 +106,13 @@ class tallyman_vec : public tallyman<value_t,count_t>
         tallyman_vec<value_t,count_t>(int nbits);
         tallyman_vec<value_t,count_t>(const tallyman_vec&) = delete;
         tallyman_vec<value_t,count_t>& operator=(const tallyman_vec&) = delete;
+        virtual ~tallyman_vec<value_t,count_t>() { if (vec_) free(vec_); }
 
 	virtual void tally(const std::vector<value_t>& ii) { for (auto i : ii) tally(i); }
 
         virtual bool is_vec() const { return true; }
 
-        virtual const std::unique_ptr<count_t[]>& get_results_vec() const { return vec_; }
+        virtual const count_t *get_results_vec() const { return vec_; }
         virtual const std::map<value_t,count_t>& get_results_map() const;
 };
 
@@ -120,7 +121,7 @@ class tallyman_map : public tallyman<value_t,count_t>
 {
     static_assert(std::is_unsigned<value_t>::value,
             "template argument value_t must be unsigned integral");
-    static_assert(std::is_integral<count_t>::value || std::is_floating_point<count_t>::value, 
+    static_assert(std::is_integral<count_t>::value || std::is_floating_point<count_t>::value,
             "template argument count_t must be a numerical type");
 
     private:
@@ -138,7 +139,7 @@ class tallyman_map : public tallyman<value_t,count_t>
 
         virtual bool is_map() const { return true; }
 
-        virtual const std::unique_ptr<count_t[]>& get_results_vec() const;
+        virtual const count_t *get_results_vec() const;
         virtual const std::map<value_t,count_t>& get_results_map() const { return map_; }
 };
 
@@ -149,6 +150,8 @@ template<typename value_t, typename count_t>
 tallyman<value_t,count_t>*
 tallyman<value_t,count_t>::create(int nbits, int max_gb)
 {
+    verbose_emit("tallyman: nbits %d, value_t %d, count_t %d", nbits, 8*sizeof(value_t), 8*sizeof(count_t));
+
     constexpr int max_bits = 8*sizeof(value_t);
 
     if (nbits < 1)
@@ -186,7 +189,7 @@ tallyman<value_t,count_t>::create(int nbits, int max_gb)
 // constructors --------------------------------------------------------------
 
 template<typename value_t, typename count_t>
-tallyman<value_t,count_t>::tallyman(int nbits) 
+tallyman<value_t,count_t>::tallyman(int nbits)
     : max_value_((1<<nbits)-1), n_invalid_(0)
 {
     constexpr int max_bits = 8*sizeof(value_t);
@@ -196,23 +199,19 @@ tallyman<value_t,count_t>::tallyman(int nbits)
 
 template<typename value_t, typename count_t>
 tallyman_vec<value_t,count_t>::tallyman_vec(int nbits)
-    : tallyman<value_t,count_t>(nbits), vec_(nullptr)
+    : tallyman<value_t,count_t>(nbits), vec_(0)
 {
     size_t alloc_n = tallyman<value_t,count_t>::max_value_ + 1;
     size_t alloc_size = alloc_n * sizeof(count_t);
 
-    count_t *data = new count_t[alloc_n];
-    if (!data)
+    vec_ = (count_t*) std::calloc(alloc_n, sizeof(count_t));
+    if (!vec_)
         raise_error("failed to allocate memory (%luMB) for tally vector",
                 static_cast<unsigned long>(alloc_size >> 20));
-
-    std::memset(data, 0, alloc_size);
-
-    vec_.reset(data);
 }
 
 template<typename value_t, typename count_t>
-tallyman_map<value_t,count_t>::tallyman_map(int nbits) 
+tallyman_map<value_t,count_t>::tallyman_map(int nbits)
     : tallyman<value_t,count_t>(nbits)
 {
 }
@@ -236,25 +235,24 @@ template<typename value_t, typename count_t>
 inline void
 tallyman_vec<value_t,count_t>::tally(value_t i)
 {
-    if (i > tallyman<value_t,count_t>::max_value_) 
-        ++tallyman<value_t,count_t>::n_invalid_; 
-    else 
-        ++vec_[i]; 
+    if (i > tallyman<value_t,count_t>::max_value_)
+        ++tallyman<value_t,count_t>::n_invalid_;
+    else
+        ++vec_[i];
 }
 
 template<typename value_t, typename count_t>
-const std::unique_ptr<count_t[]>&
+const count_t*
 tallyman_map<value_t,count_t>::get_results_vec() const
 {
-    static std::unique_ptr<count_t[]> dummy;
     raise_error("invalid invocation: get_results_vec on map implementation");
-    return dummy;
+    return 0;
 }
 
 template<typename value_t, typename count_t>
 const std::map<value_t,count_t>&
 tallyman_vec<value_t,count_t>::get_results_map() const
-{ 
+{
     static std::map<value_t,count_t> dummy;
     raise_error("invalid invocation: get_results_map on vec implementation");
     return dummy;

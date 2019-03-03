@@ -120,7 +120,10 @@ int main (int, char *argv[])
 
             // Create the kmer_counter
 
-        std::unique_ptr<kmer_counter_Q> counter(kmer_counter_Q::create(ksize, single_strand, max_mem, kmer_32bit, n_threads));
+        // It seems the 32-bit count_t is faster than the fast32
+        //
+        //std::unique_ptr<kmer_counter_Q> counter(kmer_counter_Q::create(ksize, single_strand, max_mem, kmer_32bit, n_threads));
+        std::unique_ptr<kmer_counter_S> counter(kmer_counter_S::create(ksize, single_strand, max_mem, kmer_32bit, n_threads));
 
             // Iterate over files
 

@@ -29,9 +29,15 @@ namespace {
 const unsigned A_VAL = 0, C_VAL = 1, G_VAL = 2, T_VAL = 3;
 
 typedef kmer_codec<std::uint32_t> codec32;
+typedef std::vector<std::uint32_t> vector32;
+typedef std::vector<std::uint32_t>::const_iterator v32iter;
+typedef std::vector<std::uint32_t>::const_reverse_iterator r32iter;
 static std::uint32_t invalid32 = kmer_codec<std::uint32_t>::invalid_kmer;
 
 typedef kmer_codec<std::uint64_t> codec64;
+typedef std::vector<std::uint64_t> vector64;
+typedef std::vector<std::uint64_t>::const_iterator v64iter;
+typedef std::vector<std::uint64_t>::const_reverse_iterator r64iter;
 static std::uint64_t invalid64 = kmer_codec<std::uint64_t>::invalid_kmer;
 
 // sizes and limits -----------------------------------------------------
@@ -86,14 +92,14 @@ TEST(kmercodec_test, ksize_dec1_c) {
     EXPECT_EQ(c.decode(C_VAL), "c");
 }
 
-TEST(kmercodec_test, ksize_dec1_g_is_a) {
+TEST(kmercodec_test, ksize_dec1_g_is_invalid) {
     codec32 c(1);
-    EXPECT_EQ(c.decode(G_VAL), "a");
+    EXPECT_EQ(c.decode(G_VAL), "invalid");
 }
 
-TEST(kmercodec_test, ksize_dec1_t_is_c) {
+TEST(kmercodec_test, ksize_dec1_t_is_invalid) {
     codec32 c(1);
-    EXPECT_EQ(c.decode(T_VAL), "c");
+    EXPECT_EQ(c.decode(T_VAL), "invalid");
 }
 
 TEST(kmercodec_test, ksize_dec1_a_ss) {
@@ -133,32 +139,80 @@ TEST(kmercodec_test, ksize_dec3_cgt_ss) {
 
 // encoding -------------------------------------------------------------
 
+TEST(kmercodec_test, ksize_is_string) {
+    codec32 c(7);
+    vector32 r1 = c.encode("acgtaaa");
+    EXPECT_EQ(r1.size(), 1);
+}
+
+TEST(kmercodec_test, ksize_longer_than_string) {
+    codec32 c(7);
+    vector32 r1 = c.encode("acgtaa");
+    EXPECT_EQ(r1.size(), 0);
+}
+
 TEST(kmercodec_test, reverse_long) {
     const int k = 7;
     codec32 c(k);
+
     char seq[] = "acgattagcgatagggt";
     char rev[] = "accctatcgctaatcgt";
 
-    std::vector<std::uint32_t> r1 = c.encode(seq);
-    std::vector<std::uint32_t> r2 = c.encode(rev);
+    vector32 r1 = c.encode(seq);
+    vector32 r2 = c.encode(rev);
 
-    EXPECT_EQ(r1.size(), sizeof(seq)-7);
-    EXPECT_EQ(r2.size(), sizeof(rev)-7);
+    ASSERT_EQ(r1.size(), sizeof(seq)-k);
+    ASSERT_EQ(r2.size(), sizeof(rev)-k);
 
-    for (size_t i = 0; i != r1.size(); ++i)
-        EXPECT_EQ(r1[i], r2[r2.size()-1-i]);
+    v32iter p1 = r1.begin(); 
+    r32iter p2 = r2.rbegin();
+    for (; p1 != r1.end() && p2 != r2.rend(); ++p1, ++p2)
+        EXPECT_EQ(*p1, *p2);
 }
 
-TEST(kmercodec_test, ksize_3) {
+TEST(kmercodec_test, encode_ksize_3) {
     codec32 c(3);
     char seq[] = "acgtca";
-    std::vector<std::uint32_t> r1 = c.encode(seq);
-    EXPECT_EQ(r1.size(),4); // acg -> 00110
+    vector32 r1 = c.encode(seq);
+    ASSERT_EQ(r1.size(),4); // acg -> 00110
     EXPECT_EQ(6,r1[0]); // acg -> 00110
     EXPECT_EQ(6,r1[1]); // cgt -> acg -> 00110
     EXPECT_EQ(17,r1[2]); // gtc -> gac -> 10001
     EXPECT_EQ(28,r1[3]); // tca -> 11100
 }
+
+TEST(kmercodec_test, encode_ksize_3_ss) {
+    codec32 c(3, true);
+    char seq[] = "acgtca";
+    vector32 r1 = c.encode(seq);
+    ASSERT_EQ(r1.size(),4);
+    EXPECT_EQ(6,r1[0]);  // acg -> 000110
+    EXPECT_EQ(27,r1[1]); // cgt -> 011011
+    EXPECT_EQ(45,r1[2]); // gtc -> 101101
+    EXPECT_EQ(52,r1[3]); // tca -> 110100
+}
+
+TEST(kmercodec_test, encode_ksize_15) {
+    char seq[] = "gaatctgcccagcac"; // 10 0000 1101 1110 (0)101 0100 1001 0001
+    const std::uint32_t r_canonical = 0x106F5491, r_sstrand = 0x20DE5491;
+    
+    vector32 r32s = codec32(15,true).encode(seq);
+    ASSERT_EQ(r32s.size(),1);
+    EXPECT_EQ(r_sstrand,r32s[0]);
+
+    vector32 r32c = codec32(15).encode(seq);
+    ASSERT_EQ(r32c.size(),1);
+    EXPECT_EQ(r_canonical,r32c[0]);
+
+    vector64 r64s = codec64(31,true).encode(seq);
+    ASSERT_EQ(r64s.size(),1);
+    EXPECT_EQ(r_sstrand,r64s[0]);
+
+    vector64 r64c = codec64(31).encode(seq);
+    ASSERT_EQ(r64c.size(),1);
+    EXPECT_EQ(r_canonical,r64c[0]);
+}
+
 
 // invalid input --------------------------------------------------------
 

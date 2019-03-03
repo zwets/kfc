@@ -31,18 +31,18 @@ namespace kfc {
 // The encoding method is canonical (default) or single stranded; see the
 // README.md for explanation.
 //
-// Template parameter kmer_t must be an unsigned integral type capable of
-// holding encoded k-mers of the given ksize, plus one reserved bit so that
-// invalid k-mers (having non-ACGT content) can be reported.
-//
-// If constructor argument ksize is greater than kmer_codec<kmer_t>::max_ksize,
-// the an exception will be thrown.
+// Template parameter kmer_t must be an unsigned integral type that can hold
+// encoded k-mers of the given ksize, plus one reserved bit so that invalid
+// k-mers can be reported.  Constant member kmer_codec<kmer_t>::max_ksize
+// gives the maximum ksize.  The constructor will throw an exception if ksize
+// is larger.
 //
 // The encode(string) member encodes a string of DNA to a vector of kmer
 // values.  Any kmer in string that contains an invalid base (not acgtACGT)
 // is reported as value kmer_codec<kmer_t>::invalid_kmer.
 //
-// The decode(kmer_t) member decodes a kmer to a string of DNA.
+// The decode(kmer_t) member decodes a kmer to a string of DNA.  It decodes
+// the invalid_kmer to the string "invalid".
 //
 template <typename kmer_t>
 class kmer_codec {
@@ -66,6 +66,7 @@ class kmer_codec {
         std::vector<kmer_t> encode(const std::string&) const;
 
         std::string decode(kmer_t) const;
+        std::string decode_rc(kmer_t) const;
 };
 
 
@@ -73,7 +74,7 @@ class kmer_codec {
 
 template <typename kmer_t>
 kmer_codec<kmer_t>::kmer_codec(int ksize, bool sstrand)
-    : ksize_(ksize), sstrand_(sstrand), max_kmer_((static_cast<kmer_t>(1)<<(2*max_ksize))-1)
+    : ksize_(ksize), sstrand_(sstrand), max_kmer_((static_cast<kmer_t>(1)<<(2*ksize-(sstrand?0:1)))-1)
 {
     if (ksize < 1)
         raise_error("invalid k-mer size: %d", ksize);
@@ -90,14 +91,14 @@ kmer_t
 kmer_codec<kmer_t>::encode_base(char c) const
 {
     constexpr static kmer_t X = kmer_codec<kmer_t>::invalid_kmer;
-    constexpr static kmer_t base_values[] = { 0, X, 1, X, X, X, 2, X, X, X, X, X, X, X, X, X, X, X, X, 3, X, X, X, X, X, X };
+    constexpr static kmer_t base_values[] = { 0, X, 1, X, X, X, 2, X, X, X, X, X, X, X, X, X, X, X, X, 3 };
 
-    size_t o = c - 'A';
+    unsigned o = c - 'A';
 
-    if (o < 0 || o > 19) {      // outside 'A'..'T'
+    if (o > 19) {      // outside 'A'..'T'
         o = c - 'a';            // try 'a'..'t' smallcaps
-        if (o < 0 || o > 19)
-            return -1;
+        if (o > 19)
+            return X;
     }
 
     return base_values[o];
@@ -109,17 +110,18 @@ kmer_codec<kmer_t>::encode_kmer(const std::string::const_iterator pcur) const
 {
     kmer_t res = 0;
 
-    std::string::const_iterator pmid = pcur + (ksize_ / 2);
     std::string::const_iterator pend = pcur + ksize_;
 
-    if (sstrand_) {
+    if (sstrand_) {     // single strand: encode every base as two bits
         std::string::const_iterator p = pcur - 1;
 
         while (++p != pend)
             res = (res<<2) | encode_base(*p);
     }
-    else {
-        if (!(encode_base(*pmid) & 2))  {    // middle base is a or c, encode forward
+    else {              // canonical: middle base as one bit, determines direction
+        std::string::const_iterator pmid = pcur + (ksize_ / 2);
+
+        if (!(encode_base(*pmid) & 2))  {     // middle base is a or c, encode forward
             std::string::const_iterator p = pcur - 1;
 
             while (++p != pmid)
@@ -130,7 +132,7 @@ kmer_codec<kmer_t>::encode_kmer(const std::string::const_iterator pcur) const
             while (++p != pend)
                 res = (res<<2) | encode_base(*p);
         }
-        else {
+        else {                                // middle base is g or t, encode reverse
             std::string::const_iterator p = pend;
 
             while (--p != pmid)
@@ -143,6 +145,9 @@ kmer_codec<kmer_t>::encode_kmer(const std::string::const_iterator pcur) const
         }
     }
 
+    // If any base was invalid, then the bitwise or of its all-ones representation
+    // will have set the high bit in res, and we know we must return invalid_kmer.
+
     return res > max_kmer_ ? invalid_kmer : res;
 }
 
@@ -152,7 +157,9 @@ kmer_codec<kmer_t>::encode(const std::string& s) const
 {
     std::vector<kmer_t> result;
 
+    // a string of size n produces n+1-k kmers
     size_t n = s.size() + 1;
+
     if (static_cast<size_t>(ksize_) < n)
     {
         n -= ksize_;
@@ -162,11 +169,8 @@ kmer_codec<kmer_t>::encode(const std::string& s) const
         std::string::const_iterator pcur = s.cbegin();
         std::string::const_iterator pend = pcur + n;
 
-        while (pcur != pend) {
-            kmer_t kmer = encode_kmer(pcur);
-            result.emplace_back(kmer);
-            ++pcur;
-        }
+        while (pcur != pend)
+            result.emplace_back(encode_kmer(pcur++));
     }
 
     return result;
@@ -178,30 +182,82 @@ kmer_codec<kmer_t>::decode(kmer_t kmer) const
 {
     static const char CHARS[4] = { 'a', 'c', 'g', 't' };
 
-    if (kmer == invalid_kmer)
-        return "invalid";
+    std::string result;
+
+    if (kmer > max_kmer_) {
+        result = "invalid";
+    }
+    else {
+        result.resize(ksize_);
+
+        int n = ksize_;
+        kmer_t mer = kmer;
+
+        if (sstrand_) {
+            while (n != 0) {
+                result[--n] = CHARS[0x3 & mer];
+                mer >>= 2;
+            }
+        }
+        else {
+            int m = ksize_/2 + 1;
+
+            while (n != m) {
+                result[--n] = CHARS[0x3 & mer];
+                mer >>= 2;
+            }
+
+            result[--n] = CHARS[0x1 & mer];
+            mer >>= 1;
+
+            while (n != 0) {
+                result[--n] = CHARS[0x3 & mer];
+                mer >>= 2;
+            }
+        }
+    }
+
+    return result;
+}
+
+template <typename kmer_t>
+std::string
+kmer_codec<kmer_t>::decode_rc(kmer_t kmer) const
+{
+    static const char RCHARS[4] = { 't', 'g', 'c', 'a' };
 
     std::string result;
-    result.reserve(ksize_);
 
-    if (sstrand_)
-        for (int s = 2*ksize_-2; s >= 0; s -= 2)
-            result.push_back(CHARS[0x3 & (kmer>>s)]);
+    if (kmer > max_kmer_) {
+        result = "invalid";
+    }
     else {
-        int s = 2*ksize_ - 3;
-        int m = (ksize_ - 1) / 2;
+        result.resize(ksize_);
 
-        while (s > m) {
-            result.push_back(CHARS[0x3 & (kmer>>s)]);
-            s -= 2;
+        int n = 0;
+        kmer_t mer = kmer;
+
+        if (sstrand_) {
+            while (n != ksize_) {
+                result[n++] = RCHARS[0x3 & mer];
+                mer >>= 2;
+            }
         }
+        else {
+            int m = ksize_/2;
 
-        result.push_back(CHARS[0x1 & (kmer>>m)]);
+            while (n != m) {
+                result[n++] = RCHARS[0x3 & mer];
+                mer >>= 2;
+            }
 
-        --s;
-        while (s >= 0) {
-            result.push_back(CHARS[0x3 & (kmer>>s)]);
-            s -= 2;
+            result[n++] = RCHARS[0x1 & mer];
+            mer >>= 1;
+
+            while (n != ksize_) {
+                result[n++] = RCHARS[0x3 & mer];
+                mer >>= 2;
+            }
         }
     }
 

@@ -149,7 +149,7 @@ template<typename value_t, typename count_t>
 tallyman<value_t,count_t>*
 tallyman<value_t,count_t>::create(int nbits, int max_gb)
 {
-    const int max_bits = 8*sizeof(value_t);
+    constexpr int max_bits = 8*sizeof(value_t);
 
     if (nbits < 1)
         raise_error("number of bits must be one or more: %d", nbits);
@@ -157,9 +157,8 @@ tallyman<value_t,count_t>::create(int nbits, int max_gb)
     if (nbits > max_bits)
         raise_error("%d bits requested exceeds limit %d", nbits, max_bits);
 
-    std::uintmax_t max_mb = static_cast<std::uintmax_t>(max_gb) << 10;
-    std::uintmax_t vec_mcount = static_cast<std::uintmax_t>(1) << (nbits > 20 ? nbits - 20 : 0);
-    std::uintmax_t vec_mb = vec_mcount * sizeof(count_t);
+    unsigned long max_mb = static_cast<unsigned long>(max_gb) << 10;
+    unsigned long vec_mb = sizeof(count_t) * (1UL << std::max(0, nbits-20));
 
     if (max_gb == 0)
     {
@@ -167,24 +166,19 @@ tallyman<value_t,count_t>::create(int nbits, int max_gb)
         max_mb = phy_mb > 2048 ? phy_mb - 2048 : phy_mb;
 
         verbose_emit("defaulting max memory to all%s physical memory: %luG",
-                phy_mb > 2048 ? " but 2G" : "",
-                static_cast<unsigned long>(max_mb >> 10));
+                phy_mb > 2048 ? " but 2G" : "", (max_mb>>10));
     }
 
     if (vec_mb > max_mb)
     {
         verbose_emit("vector memory (%luG) would exceed %luG: tallying using map",
-                static_cast<unsigned long>(vec_mb >> 10),
-                static_cast<unsigned long>(max_mb >> 10));
-
+                (vec_mb>> 10), (max_mb>>10));
         return new tallyman_map<value_t,count_t>(nbits);
     }
     else
     {
         verbose_emit("vector memory (%luG) fits %luG: tallying using linear vector",
-                static_cast<unsigned long>(vec_mb >> 10),
-                static_cast<unsigned long>(max_mb >> 10));
-
+                (vec_mb>>10), (max_mb>>10));
         return new tallyman_vec<value_t,count_t>(nbits);
     }
 }
@@ -195,8 +189,8 @@ template<typename value_t, typename count_t>
 tallyman<value_t,count_t>::tallyman(int nbits) 
     : max_value_((1<<nbits)-1), n_invalid_(0)
 {
-    const int max_bits = 8*sizeof(value_t);
-    if (nbits > 8*(int)sizeof(value_t))
+    constexpr int max_bits = 8*sizeof(value_t);
+    if (nbits > max_bits)
         raise_error("number of bits (%d) exceeds maximum %d", nbits, max_bits);
 }
 

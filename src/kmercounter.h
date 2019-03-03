@@ -35,7 +35,7 @@ template <typename kmer_t, typename count_t> class kmer_counter_impl;
 // kmer_counter_{L,Q,S,D} - convenience typedefs for kmer_counter with different
 // count_t data types.  The count_t type tallies kmer hits, and must be small
 // to save on memory, but large enough to not overflow.  It can be integral
-// or floating point, though the latter is likely to be slower.
+// or floating point, though the latter is likely slower.
 //
 // - L: if there could ever be more than 4G occurrences of a single kmer
 // - Q: if you value speed at the cost of possible larger memory consumption
@@ -53,16 +53,11 @@ typedef kmer_counter<double>             kmer_counter_D;
 // Perform any number of calls to process(seq), then invoke write_results()
 // to output the detected kmers and their counts.
 //
-// This class has two implementations: one for ksize up to 15 (32-bits),
-// and one for ksize up to 31 (64-bits).  The static create() factory method
-// produces the most memory-efficient implementation for the given ksize.
-//
-// Note that the 32-bit (memory-efficient) implementation may be slower
-// than the 64-bit implementation, so for small ksizes you may still want
-// to instantiate the 64-bit implementation, or let the compiler choose
-// the fastest implementation.  This is simply done by:
-//
-//     kmer_counter_impl<std::uint_fast32_t, std::uint_fast32_t> counter(...)
+// This class has two implementations: one fits ksize up to 15 (32-bits), the
+// other fits ksize up to 31 (64-bits).  The static create() factory method
+// chooses between these depending on ksize and the opt_mem parameter.
+// By default, if ksize is small, it picks std::uint_fast32_t which may mean
+// 64-bit.  With opt_mem = true, it forces 32-bit.
 //
 // The tallyman component in the implementation classes encapsulates further
 // optimisations for speed and memory consumption; see tallyman.h for details.
@@ -79,7 +74,7 @@ class kmer_counter
         int n_threads_;
 
     public:
-        static kmer_counter<count_t>* create(int ksize, bool s_strand = false, int max_gb = 0, int n_threads = 0);
+        static kmer_counter<count_t>* create(int ksize, bool s_strand = false, int max_gb = 0, bool opt_mem = false, int n_threads = 0);
 
     public:
         kmer_counter(int ksize, bool s_strand, int n_threads);
@@ -127,14 +122,17 @@ class kmer_counter_impl : public kmer_counter<count_t>
 // kmer_counter factory  --------------------------------------------------------
 
 template <typename count_t>
-kmer_counter<count_t>* kmer_counter<count_t>::create(int ksize, bool s_strand, int max_gb, int n_threads)
+kmer_counter<count_t>* kmer_counter<count_t>::create(int ksize, bool s_strand, int max_gb, bool opt_mem, int n_threads)
 {
-    kmer_counter<count_t> *ret;
+    kmer_counter<count_t> *ret = 0;
 
     if (ksize < 1)
         raise_error("invalid k-mer size: %d", ksize);
     else if (ksize <= kmer_counter_impl<std::uint32_t,count_t>::max_ksize)
-        ret = new kmer_counter_impl<std::uint32_t,count_t>(ksize, s_strand, max_gb, n_threads);
+        if (opt_mem)
+            ret = new kmer_counter_impl<std::uint32_t,count_t>(ksize, s_strand, max_gb, n_threads);
+        else
+            ret = new kmer_counter_impl<std::uint_fast32_t,count_t>(ksize, s_strand, max_gb, n_threads);
     else if (ksize <= kmer_counter_impl<std::uint64_t,count_t>::max_ksize)
         ret = new kmer_counter_impl<std::uint64_t,count_t>(ksize, s_strand, max_gb, n_threads);
     else
@@ -158,7 +156,7 @@ kmer_counter<count_t>::kmer_counter(int ksize, bool s_strand, int n_threads)
 template <typename kmer_t,typename count_t>
 kmer_counter_impl<kmer_t,count_t>::kmer_counter_impl(int ksize, bool s_strand, int mem_gb, int n_threads)
     : kmer_counter<count_t>(ksize, s_strand, n_threads),
-      tallyman_(tallyman<kmer_t,count_t>::create(2*ksize + (s_strand ? 1 : 0), mem_gb)),
+      tallyman_(tallyman<kmer_t,count_t>::create(2*ksize-(s_strand?0:1), mem_gb)),
       codec_(ksize, s_strand)
 { 
     if (ksize > max_ksize)

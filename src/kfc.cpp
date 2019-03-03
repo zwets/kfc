@@ -41,6 +41,7 @@ static const char USAGE[] = "\n"
 "   -s        consider input to be single stranded, do not canonicalise k-mers\n"
 "   -m MEM    constrain memory use to about MEM GB (default: all minus 2GB)\n"
 "   -t NUM    use NUM threads (default: all system threads)\n"
+"   -x        force k-mers in 32-bits (you normally won't need this option)\n"
 "   -v        produce verbose output to stderr\n"
 "\n"
 "  Each FILE can be an (optionally gzipped) FASTA, FASTQ, or plain DNA file.\n"
@@ -72,6 +73,7 @@ int main (int, char *argv[])
     int ksize = DEFAULT_KSIZE;
     bool single_strand = false;
     int max_mem = 0;
+    int kmer_32bit = false;
     int n_threads = 0;
 
     set_progname("kfc");
@@ -92,6 +94,9 @@ int main (int, char *argv[])
             }
             else if (opt == 's') {
                 single_strand = true;
+            }
+            else if (opt == 'x') {
+                kmer_32bit = true;
             }
             else if (!*++argv) {    // subsequent options require argument
                 usage_exit();
@@ -115,18 +120,18 @@ int main (int, char *argv[])
 
             // Create the kmer_counter
 
-        std::unique_ptr<kmer_counter_Q> counter(kmer_counter_Q::create(ksize, single_strand, max_mem, n_threads));
+        std::unique_ptr<kmer_counter_Q> counter(kmer_counter_Q::create(ksize, single_strand, max_mem, kmer_32bit, n_threads));
 
             // Iterate over files
 
-        std::string fname = *(argv+1) ? *++argv : "-";
+        std::string fname(*argv ? *argv++ : "-");
 
         do {
             verbose_emit("reading file: %s", fname.c_str());
 
             std::istream *is = &std::cin;
-            std::ifstream in_file;
 
+            std::ifstream in_file;
             if (fname != "-") {
                 in_file.open(fname, std::ios_base::in|std::ios_base::binary);
                 if (!in_file)
@@ -142,13 +147,14 @@ int main (int, char *argv[])
 
             in_file.close();
 
-            fname = *++argv ? *argv : "";
+            fname = *argv ? *argv++ : "";
 
         } while (!fname.empty());
 
             // Output kmer_counter results
 
         counter->write_results(std::cout);
+        std::cout << "TODO: write results" << std::endl;
 
     }
     catch (std::runtime_error e) {

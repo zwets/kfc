@@ -55,9 +55,11 @@ typedef kmer_counter<double>             kmer_counter_D;
 //
 // This class has two implementations: one fits ksize up to 15 (32-bits), the
 // other fits ksize up to 31 (64-bits).  The static create() factory method
-// chooses between these depending on ksize and the opt_mem parameter.
+// chooses between these depending on ksize and the k32_bit parameter.
+//
 // By default, if ksize is small, it picks std::uint_fast32_t which may mean
-// 64-bit.  With opt_mem = true, it forces 32-bit.
+// it uses 64-bit.  With k32_bit = true, it forces 32-bit.  Note however that
+// the bit-size of kmer_t isn't as impactful on memory as count_t.
 //
 // The tallyman component in the implementation classes encapsulates further
 // optimisations for speed and memory consumption; see tallyman.h for details.
@@ -74,7 +76,7 @@ class kmer_counter
         int n_threads_;
 
     public:
-        static kmer_counter<count_t>* create(int ksize, bool s_strand = false, int max_gb = 0, bool opt_mem = false, int n_threads = 0);
+        static kmer_counter<count_t>* create(int ksize, bool s_strand = false, int max_gb = 0, bool k32_bit = false, int n_threads = 0);
 
     public:
         kmer_counter(int ksize, bool s_strand, int n_threads);
@@ -122,14 +124,14 @@ class kmer_counter_impl : public kmer_counter<count_t>
 // kmer_counter factory  --------------------------------------------------------
 
 template <typename count_t>
-kmer_counter<count_t>* kmer_counter<count_t>::create(int ksize, bool s_strand, int max_gb, bool opt_mem, int n_threads)
+kmer_counter<count_t>* kmer_counter<count_t>::create(int ksize, bool s_strand, int max_gb, bool k32_bit, int n_threads)
 {
     kmer_counter<count_t> *ret = 0;
 
     if (ksize < 1)
         raise_error("invalid k-mer size: %d", ksize);
     else if (ksize <= kmer_counter_impl<std::uint32_t,count_t>::max_ksize)
-        if (opt_mem)
+        if (k32_bit)
             ret = new kmer_counter_impl<std::uint32_t,count_t>(ksize, s_strand, max_gb, n_threads);
         else
             ret = new kmer_counter_impl<std::uint_fast32_t,count_t>(ksize, s_strand, max_gb, n_threads);

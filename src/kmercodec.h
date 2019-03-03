@@ -65,8 +65,7 @@ class kmer_codec {
         kmer_t encode_kmer(std::string::const_iterator) const;
         std::vector<kmer_t> encode(const std::string&) const;
 
-        std::string decode(kmer_t) const;
-        std::string decode_rc(kmer_t) const;
+        std::string decode(kmer_t, bool rc = false) const;
 };
 
 
@@ -178,52 +177,9 @@ kmer_codec<kmer_t>::encode(const std::string& s) const
 
 template <typename kmer_t>
 std::string
-kmer_codec<kmer_t>::decode(kmer_t kmer) const
+kmer_codec<kmer_t>::decode(kmer_t kmer, bool rc) const
 {
-    static const char CHARS[4] = { 'a', 'c', 'g', 't' };
-
-    std::string result;
-
-    if (kmer > max_kmer_) {
-        result = "invalid";
-    }
-    else {
-        result.resize(ksize_);
-
-        int n = ksize_;
-        kmer_t mer = kmer;
-
-        if (sstrand_) {
-            while (n != 0) {
-                result[--n] = CHARS[0x3 & mer];
-                mer >>= 2;
-            }
-        }
-        else {
-            int m = ksize_/2 + 1;
-
-            while (n != m) {
-                result[--n] = CHARS[0x3 & mer];
-                mer >>= 2;
-            }
-
-            result[--n] = CHARS[0x1 & mer];
-            mer >>= 1;
-
-            while (n != 0) {
-                result[--n] = CHARS[0x3 & mer];
-                mer >>= 2;
-            }
-        }
-    }
-
-    return result;
-}
-
-template <typename kmer_t>
-std::string
-kmer_codec<kmer_t>::decode_rc(kmer_t kmer) const
-{
+    static const char CHARS[4] =  { 'a', 'c', 'g', 't' };
     static const char RCHARS[4] = { 't', 'g', 'c', 'a' };
 
     std::string result;
@@ -234,29 +190,59 @@ kmer_codec<kmer_t>::decode_rc(kmer_t kmer) const
     else {
         result.resize(ksize_);
 
-        int n = 0;
         kmer_t mer = kmer;
 
-        if (sstrand_) {
-            while (n != ksize_) {
-                result[n++] = RCHARS[0x3 & mer];
-                mer >>= 2;
+        if (!rc) {  // forward
+
+            int n = ksize_;
+
+            if (sstrand_) {
+                while (n != 0) {
+                    result[--n] = CHARS[0x3 & mer];
+                    mer >>= 2;
+                }
+            }
+            else {
+                int m = ksize_/2 + 1;
+
+                while (n != m) {
+                    result[--n] = CHARS[0x3 & mer];
+                    mer >>= 2;
+                }
+
+                result[--n] = CHARS[0x1 & mer];
+                mer >>= 1;
+
+                while (n != 0) {
+                    result[--n] = CHARS[0x3 & mer];
+                    mer >>= 2;
+                }
             }
         }
-        else {
-            int m = ksize_/2;
+        else {      // reverse complement
+            int n = 0;
 
-            while (n != m) {
-                result[n++] = RCHARS[0x3 & mer];
-                mer >>= 2;
+            if (sstrand_) {
+                while (n != ksize_) {
+                    result[n++] = RCHARS[0x3 & mer];
+                    mer >>= 2;
+                }
             }
+            else {
+                int m = ksize_/2;
 
-            result[n++] = RCHARS[0x1 & mer];
-            mer >>= 1;
+                while (n != m) {
+                    result[n++] = RCHARS[0x3 & mer];
+                    mer >>= 2;
+                }
 
-            while (n != ksize_) {
-                result[n++] = RCHARS[0x3 & mer];
-                mer >>= 2;
+                result[n++] = RCHARS[0x1 & mer];
+                mer >>= 1;
+
+                while (n != ksize_) {
+                    result[n++] = RCHARS[0x3 & mer];
+                    mer >>= 2;
+                }
             }
         }
     }

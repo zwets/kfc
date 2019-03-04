@@ -268,7 +268,7 @@ TEST(kmercounter_test, encode_ksize_15_ss_1gb) {
 }
 
 TEST(kmercounter_test, encode_ksize_31) {
-    char seq[] = "TAAGCGTTTGCTATGCCATCCCATCGGGCCA"; 
+    char seq[] = "taagcgtttgctatgccatcccatcgggcca"; 
     counter64 *c = counter64::create(31, false);
     c->process(seq);
 
@@ -287,7 +287,7 @@ TEST(kmercounter_test, encode_ksize_31) {
 }
 
 TEST(kmercounter_test, encode_ksize_31_ss) {
-    char seq[] = "TAAGCGTTTGCTATGCCATCCCATCGGGCCA"; 
+    char seq[] = "taagcgtttgctatgccatcccatcgggcca"; 
     counter64 *c = counter64::create(31, true);
     c->process(seq);
 

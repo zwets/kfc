@@ -132,6 +132,7 @@ class kmer_counter_impl : public kmer_counter<count_t>
 
     private:
         void write_vec_results(std::ostream&, const count_t*, const count_t*, bool dna, bool zeros) const;
+        void write_map_results(std::ostream&, bool dna, bool zeros) const;
 };
 
 
@@ -226,7 +227,7 @@ kmer_counter_impl<kmer_t, count_t>::write_results(std::ostream &os, unsigned opt
         write_vec_results(os, data, data + tallyman_->max_value() + 1, do_dna, do_zeros);
     }
     else {
-        os << "... under construction ...\n";
+        write_map_results(os, do_dna, do_zeros);
     }
 
     if (do_invalid && (n_invalid || do_zeros)) {
@@ -235,30 +236,6 @@ kmer_counter_impl<kmer_t, count_t>::write_results(std::ostream &os, unsigned opt
         os << tallyman_->max_value() + 1 << '\t' << n_invalid << std::endl;
     }
 
-/*
-    const tallyman<kmer_t, count_t> *tallyman = counter.get_tallyman();
-
-    std::cout << "invalid" << '\t' << tallyman->invalid_count() << std::endl;
-
-    if (tallyman->is_vec()) {
-    const count_t *p1 = p0 + tallyman->max_value() + 1;
-	while (++p != p1)
-	    if (*p)
-		std::cout << *p << '\t' << p - p0 << std::endl;
-    }
-    else if (tallyman->is_map32()) {
-	std::map<tallyman::val32_t,kfc::count_t>::const_iterator p0 = tallyman->get_results_map32().begin();
-	std::map<tallyman::val32_t,kfc::count_t>::const_iterator p1 = tallyman->get_results_map32().end();
-	for (std::map<tallyman::val32_t,kfc::count_t>::const_iterator p = p0; p != p1; ++p)
-	    std::cout << p->first << '\t' << p->second << std::endl;
-    }
-    else { // is_map64
-	std::map<tallyman::val64_t,kfc::count_t>::const_iterator p0 = tallyman->get_results_map64().begin();
-	std::map<tallyman::val64_t,kfc::count_t>::const_iterator p1 = tallyman->get_results_map64().end();
-	for (std::map<tallyman::val64_t,kfc::count_t>::const_iterator p = p0; p != p1; ++p)
-	    std::cout << p->first << '\t' << p->second << std::endl;
-    }
-*/
     return os;
 }
 
@@ -276,6 +253,48 @@ kmer_counter_impl<kmer_t, count_t>::write_vec_results(std::ostream &os, const co
             os << kmer << '\t' << *p << std::endl;
         }
         ++kmer;
+    }
+}
+
+template <typename kmer_t, typename count_t>
+void
+kmer_counter_impl<kmer_t, count_t>::write_map_results(std::ostream &os, bool dna, bool zeros) const
+{
+    const std::map<kmer_t,count_t>& map = tallyman_->get_results_map();
+
+    typename std::map<kmer_t,count_t>::const_iterator p = map.begin();
+    typename std::map<kmer_t,count_t>::const_iterator pend = map.end();
+
+    if (!zeros) {
+        while (p != pend) {
+            if (dna)
+                os << codec_.decode(p->first) << '\t';
+            os << p->first << '\t' << p->second << std::endl;
+            ++p;
+        }
+    }
+    else {
+        kmer_t kmer = 0;
+        kmer_t done_kmer = tallyman_->max_value() + 1;
+        kmer_t next_kmer = p == pend ? done_kmer : p->first;
+
+        while (kmer != done_kmer) {
+
+            while (kmer != next_kmer) {
+                if (dna)
+                    os << codec_.decode(kmer) << '\t';
+                os << kmer << "\t0" << std::endl;
+                ++kmer;
+            }
+
+            if (kmer != done_kmer) { // so it is next_kmer and p->first
+                if (dna)
+                    os << codec_.decode(kmer) << '\t';
+                os << kmer << '\t' << p->second << std::endl;
+                next_kmer = ++p == pend ? done_kmer : p->first;
+                ++kmer;
+            }
+        }
     }
 }
 

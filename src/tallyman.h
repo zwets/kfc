@@ -191,7 +191,7 @@ tallyman<value_t,count_t>::create(int nbits, int max_gb)
 
 template<typename value_t, typename count_t>
 tallyman<value_t,count_t>::tallyman(int nbits)
-    : max_value_((1<<nbits)-1), n_invalid_(0)
+    : max_value_((static_cast<value_t>(1)<<nbits)-1), n_invalid_(0)
 {
     constexpr int max_bits = 8*sizeof(value_t);
     if (nbits > max_bits)

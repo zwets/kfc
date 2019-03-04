@@ -45,6 +45,7 @@ else
 endif
 
 TEST_OBJS = \
+	kmercounter-test.o \
 	kmercodec-test.o \
 	tallyman-test.o \
 	seqreader-test.o

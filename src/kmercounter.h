@@ -229,7 +229,7 @@ kmer_counter_impl<kmer_t, count_t>::write_results(std::ostream &os, unsigned opt
         os << "... under construction ...\n";
     }
 
-    if (do_invalid) {
+    if (do_invalid && (n_invalid || do_zeros)) {
         if (do_dna)
             os << "invalid\t";
         os << tallyman_->max_value() + 1 << '\t' << n_invalid << std::endl;

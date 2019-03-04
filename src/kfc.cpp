@@ -27,7 +27,6 @@
 
 using namespace kfc;
 
-
 static const int DEFAULT_KSIZE = 15;
 static const int MAX_KSIZE = 32;
 
@@ -39,6 +38,10 @@ static const char USAGE[] = "\n"
 "  OPTIONS\n"
 "   -k KSIZE  k-mer size (default %d), must be odd unless option -s is present\n"
 "   -s        consider input to be single stranded, do not canonicalise k-mers\n"
+"   -n        output k-mers as bit-encoded numbers only, no DNA sequence output\n"
+"   -z        include k-mers with a zero count in the output (default omitted)\n"
+"   -i        include the invalid k-mer count in the output (default stderr)\n"
+"   -q        suppress output headers\n"
 "   -m MEM    constrain memory use to about MEM GB (default: all minus 2GB)\n"
 "   -t NUM    use NUM threads (default: all system threads)\n"
 "   -x        force k-mers in 32-bits (you normally won't need this option)\n"
@@ -56,6 +59,11 @@ static const char USAGE[] = "\n"
 "\n"
 "  If option -s is present, then k-mers are output as they occur in the input,\n"
 "  reverse complements are counted separately, and KSIZE may be odd or even.\n"
+"\n"
+"  The output has three columns: k-mer dna sequence, k-mer number, count.  The\n"
+"  DNA column can be suppressed with option -n.  K-mers with a 0 count are not\n"
+"  output unless option -z is present.  Option -i includes the invalid k-mer\n"
+"  count in the output (by default printed to standard error)\n"
 "\n"
 "  More information: http://io.zwets.it/kfc.\n"
 "\n";
@@ -75,6 +83,7 @@ int main (int, char *argv[])
     int max_mem = 0;
     int kmer_32bit = false;
     int n_threads = 0;
+    unsigned o_opts = output_opts::none;
 
     set_progname("kfc");
 
@@ -97,6 +106,18 @@ int main (int, char *argv[])
             }
             else if (opt == 'x') {
                 kmer_32bit = true;
+            }
+            else if (opt == 'n') {
+                o_opts |= output_opts::no_dna;
+            }
+            else if (opt == 'z') {
+                o_opts |= output_opts::zeros;
+            }
+            else if (opt == 'i') {
+                o_opts |= output_opts::invalids;
+            }
+            else if (opt == 'q') {
+                o_opts |= output_opts::no_headers;
             }
             else if (!*++argv) {    // subsequent options require argument
                 usage_exit();
@@ -156,8 +177,7 @@ int main (int, char *argv[])
 
             // Output kmer_counter results
 
-        counter->write_results(std::cout);
-        std::cout << "TODO: write results" << std::endl;
+        counter->write_results(std::cout, o_opts);
 
     }
     catch (std::runtime_error e) {

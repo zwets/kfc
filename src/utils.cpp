@@ -33,13 +33,27 @@ static const char* progname = "";
 void
 set_progname(const char *p)
 {
-    progname = p;
+    if (p)
+        progname = p;
 }
 
 void
 set_verbose(bool v)
 {
     verbose = v;
+}
+
+void
+emit(const char *fmt, ...)
+{
+    char buf[2048];
+
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
+
+    std::cerr << progname << ": " << buf << std::endl;
 }
 
 void

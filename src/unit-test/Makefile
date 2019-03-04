@@ -28,6 +28,7 @@ GTEST_HEADERS = $(GTEST_DIR)/include/gtest/*.h \
 TARGET = run-all-tests
 
 USER_HEADERS = \
+	$(USER_DIR)/kmercounter.h \
 	$(USER_DIR)/kmercodec.h \
 	$(USER_DIR)/tallyman.h \
 	$(USER_DIR)/seqreader.h \

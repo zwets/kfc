@@ -1,5 +1,5 @@
 /* kmercounter.h
- * 
+ *
  * Copyright (C) 2018  Marco van Zwetselaar <io@zwets.it>
  *
  * This program is free software: you can redistribute it and/or modify
@@ -41,11 +41,22 @@ template <typename kmer_t, typename count_t> class kmer_counter_impl;
 // - Q: if you value speed at the cost of possible larger memory consumption
 // - S: if you value low memory consumption over possible faster speed
 // - D: if you want to try using a double for keeping count
-// 
+//
 typedef kmer_counter<std::uint_fast64_t> kmer_counter_L;
 typedef kmer_counter<std::uint_fast32_t> kmer_counter_Q;
 typedef kmer_counter<std::uint32_t>      kmer_counter_S;
 typedef kmer_counter<double>             kmer_counter_D;
+
+
+// output_opts - bit field flag for kmer_counter<>::write_results()
+//
+enum output_opts : unsigned {
+    none=0,         // default: three tab-separated columns: dna, kmer, count
+    no_dna=1,       // omit the first (DNA string) column
+    no_headers=2,   // omit the header line(s)
+    zeros=4,        // include k-mers with zero counts
+    invalids=8      // include a pseudo-k-mer with the invalid count
+};
 
 
 // kmer_counter
@@ -86,7 +97,7 @@ class kmer_counter
         bool single_strand() const { return s_strand_; }
 
         virtual void process(const std::string& data) = 0;
-        virtual std::ostream& write_results(std::ostream& os) const = 0;
+        virtual std::ostream& write_results(std::ostream& os, unsigned = output_opts::none) const = 0;
 };
 
 
@@ -117,7 +128,7 @@ class kmer_counter_impl : public kmer_counter<count_t>
         virtual ~kmer_counter_impl() { }
 
         virtual void process(const std::string& data);
-        virtual std::ostream& write_results(std::ostream& os) const;
+        virtual std::ostream& write_results(std::ostream& os, unsigned = output_opts::none) const;
 };
 
 
@@ -147,8 +158,8 @@ kmer_counter<count_t>* kmer_counter<count_t>::create(int ksize, bool s_strand, i
 
 template <typename count_t>
 kmer_counter<count_t>::kmer_counter(int ksize, bool s_strand, int n_threads)
-    : ksize_(ksize), s_strand_(s_strand), n_threads_(n_threads) 
-{ 
+    : ksize_(ksize), s_strand_(s_strand), n_threads_(n_threads)
+{
     if (ksize < 1)
         raise_error("invalid k-mer size: %d", ksize);
 }
@@ -160,7 +171,7 @@ kmer_counter_impl<kmer_t,count_t>::kmer_counter_impl(int ksize, bool s_strand, i
     : kmer_counter<count_t>(ksize, s_strand, n_threads),
       tallyman_(tallyman<kmer_t,count_t>::create(2*ksize-(s_strand?0:1), mem_gb)),
       codec_(ksize, s_strand)
-{ 
+{
     if (ksize > max_ksize)
         raise_error("k-mer size %d too large for this impl (max %d)", ksize, max_ksize);
 }
@@ -175,8 +186,47 @@ kmer_counter_impl<kmer_t,count_t>::process(const std::string& data)
 
 template <typename kmer_t, typename count_t>
 std::ostream&
-kmer_counter_impl<kmer_t, count_t>::write_results(std::ostream &os) const
+kmer_counter_impl<kmer_t, count_t>::write_results(std::ostream &os, unsigned opts) const
 {
+    if (!os)
+        return os;
+
+    bool do_headers = (opts & output_opts::no_headers) == 0;
+    bool do_dna = (opts & output_opts::no_dna) == 0;
+    bool do_invalid = (opts & output_opts::invalids) != 0;
+    bool do_zeros = (opts & output_opts::zeros) != 0;
+
+    int k = kmer_counter<count_t>::ksize_;
+    bool s = kmer_counter<count_t>::s_strand_;
+    count_t n_invalid = tallyman_->invalid_count();
+
+    if (n_invalid && !do_invalid)
+        emit("counted %lu invalid k-mers", static_cast<unsigned long>(n_invalid));
+
+    if (do_headers) {
+        // Line 1
+        os << "# kfc " << k << "-mer counts "
+            << (s ? "(single strand directional)": "(canonical, destranded)" );
+        if (!do_invalid && n_invalid) // if !do_invalid then show in header
+            os << "; excluding " << n_invalid << " invalid k-mers";
+        if (!do_zeros)
+            os << "; omitting zero counts";
+        os << std::endl;
+        // Line 2
+        os << "#";
+        if (do_dna) os << "k-mer\t";
+        os << (s ? "s-code" : "c-code") << '\t' << "count" << std::endl;
+    }
+
+    std::cout <<
+        "... under construction ...\n";
+
+    if (do_invalid) {
+        if (do_dna)
+            os << "invalid\t";
+        os << tallyman_->max_value() + 1 << '\t' << n_invalid << std::endl;
+    }
+
     /*
     if (os) {
         if (impl64) {

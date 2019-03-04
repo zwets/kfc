@@ -35,7 +35,9 @@ GitHub, here are the steps to run it:
       # For convenience in the examples below, put kfc on the path
       PATH="$PATH:$PWD"  # when in the ./src directory
 
-  Alternatively, copy `kfc` to your `~/bin` or `~/.local/bin` directory.
+  Alternatively, copy or symlink `kfc` to your `~/bin` or `~/.local/bin` directory.
+
+      ln -sft ~/bin "$PWD/kfc"     # when in the ./src directory
 
 * Run
 
@@ -51,7 +53,7 @@ GitHub, here are the steps to run it:
 
 ## FAQ
 
-#### What are canonical k-mers?
+#### What are canonical (destranded) k-mers?
 
 By default, `kfc` treats k-mers and their reverse complement as the same k-mer.
 For instance, if 3-mers `tgc` and `gca` both occur in the input, then they are
@@ -66,14 +68,20 @@ we're explicitly dealing with single-stranded DNA):
     ---gca-->           ---tgc-->
 
 
-Clearly, `tgc` and `gca` refer to the same _base pair sequence_, and the choice
-to name this either `gca` or `tgc` is arbitrary.  `kfc` simply picks whichever
-of the two has *a* or *c* as its middle base, and calls this the _'canonical'_
-kmer.  (Note: the requirement that k be odd guarantees that there ís a middle
-base!)
+Clearly, `tgc` and `gca` refer to the same base pair sequence, and the choice
+of name (`gca` or `tgc`) is arbitrary.  `kfc` simply picks whichever of the
+two has *a* or *c* as its middle base.  It calls this the 'canonical' k-mer.
+The requirement that k be odd guarantees that there ís a middle base.
+
+If you do not want this 'destranded' behaviour, use option `-s` to treat the
+input as single stranded DNA.  In this mode, only the k-mers which are
+literally seen in the input are reported.  Note that this makes the k-mer
+space twice as large, since the middle base can take on twice as many values.
+(In fact, in this mode there needn't even be a middle base, and k may be odd
+or even.)
 
 
-#### What are k-mer numbers?
+#### What are k-mer numbers (s-code, c-code)?
 
 `kfc` encodes each k-mer as an integral number.  @@TODO@@
 

@@ -1,6 +1,6 @@
 # kfc - k-mer frequency counter
 
-Ultra-fast k-mer counter *UNDER CONSTRUCTION*
+Ultra-fast k-mer counter
 
 Home: https://github.com/zwets/kfc
 
@@ -83,14 +83,18 @@ or even.)
 
 #### What are k-mer numbers (s-code, c-code)?
 
-`kfc` encodes each k-mer as an integral number.  @@TODO@@
+`kfc` encodes each k-mer as a integral number.  For the sake of naming things,
+kfc calls this number an s-code (when in single stranded mode), or c-code (in
+default canonical mode).
+
+@@TODO@@
 
 
 ---
 
 #### Licence
 
-kfc - k-mer frequency counter
+kfc - k-mer frequency counter  
 Copyright (C) 2019  Marco van Zwetselaar <io@zwets.it>
 
 This program is free software: you can redistribute it and/or modify

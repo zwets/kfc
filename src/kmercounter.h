@@ -129,6 +129,9 @@ class kmer_counter_impl : public kmer_counter<count_t>
 
         virtual void process(const std::string& data);
         virtual std::ostream& write_results(std::ostream& os, unsigned = output_opts::none) const;
+
+    private:
+        void write_vec_results(std::ostream&, const count_t*, const count_t*, bool dna, bool zeros) const;
 };
 
 
@@ -218,8 +221,13 @@ kmer_counter_impl<kmer_t, count_t>::write_results(std::ostream &os, unsigned opt
         os << (s ? "s-code" : "c-code") << '\t' << "count" << std::endl;
     }
 
-    std::cout <<
-        "... under construction ...\n";
+    if (tallyman_->is_vec()) {
+        const count_t *data = tallyman_->get_results_vec();
+        write_vec_results(os, data, data + tallyman_->max_value() + 1, do_dna, do_zeros);
+    }
+    else {
+        os << "... under construction ...\n";
+    }
 
     if (do_invalid) {
         if (do_dna)
@@ -227,29 +235,13 @@ kmer_counter_impl<kmer_t, count_t>::write_results(std::ostream &os, unsigned opt
         os << tallyman_->max_value() + 1 << '\t' << n_invalid << std::endl;
     }
 
-    /*
-    if (os) {
-        if (impl64) {
-            if (impl64->is_vec) {
-                impl64->get_results_vec();
-            }
-            else {
-                impl64->get_results_map();
-            }
-        }
-        else {
-            const tallyman<std::uint32_t,count_t> *t = impl32->tallyman();
-        }
-    }
-
+/*
     const tallyman<kmer_t, count_t> *tallyman = counter.get_tallyman();
 
     std::cout << "invalid" << '\t' << tallyman->invalid_count() << std::endl;
 
     if (tallyman->is_vec()) {
-	const kfc::count_t *p0 = tallyman->get_results_vec().get();
-	const kfc::count_t *p1 = p0 + tallyman->max_value() + 1;
-	const kfc::count_t *p = p0 - 1;
+    const count_t *p1 = p0 + tallyman->max_value() + 1;
 	while (++p != p1)
 	    if (*p)
 		std::cout << *p << '\t' << p - p0 << std::endl;
@@ -268,6 +260,23 @@ kmer_counter_impl<kmer_t, count_t>::write_results(std::ostream &os, unsigned opt
     }
 */
     return os;
+}
+
+
+template <typename kmer_t, typename count_t>
+void
+kmer_counter_impl<kmer_t, count_t>::write_vec_results(std::ostream &os, const count_t *pdata, const count_t *pend, bool dna, bool zeros) const
+{
+    const count_t *p = pdata - 1;
+    kmer_t kmer = 0;
+    while (++p != pend) {
+        if (*p || zeros) {
+            if (dna)
+                os << codec_.decode(kmer) << '\t';
+            os << kmer << '\t' << *p << std::endl;
+        }
+        ++kmer;
+    }
 }
 
 

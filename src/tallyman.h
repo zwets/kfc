@@ -78,6 +78,7 @@ class tallyman {
     public:
         virtual ~tallyman() { }
 
+	virtual void tally(std::vector<value_t> &&) = 0;
 	virtual void tally(const std::vector<value_t>&) = 0;
 
         virtual bool is_vec() const { return false; }
@@ -109,7 +110,8 @@ class tallyman_vec : public tallyman<value_t,count_t>
         tallyman_vec<value_t,count_t>& operator=(const tallyman_vec&) = delete;
         virtual ~tallyman_vec<value_t,count_t>() { if (vec_) free(vec_); }
 
-	virtual void tally(const std::vector<value_t>& ii);
+	virtual void tally(std::vector<value_t> &&);
+	virtual void tally(const std::vector<value_t>&);
 
         virtual bool is_vec() const { return true; }
 
@@ -136,7 +138,8 @@ class tallyman_map : public tallyman<value_t,count_t>
         tallyman_map<value_t,count_t>(const tallyman_map<value_t,count_t>&) = delete;
         tallyman_map<value_t,count_t>& operator=(const tallyman_map<value_t,count_t>&) = delete;
 
-        virtual void tally(const std::vector<value_t>& ii);
+        virtual void tally(std::vector<value_t>&&);
+        virtual void tally(const std::vector<value_t>&);
 
         virtual bool is_map() const { return true; }
 
@@ -231,10 +234,18 @@ tallyman_vec<value_t,count_t>::tally(value_t i)
 
 template<typename value_t, typename count_t>
 inline void
-tallyman_vec<value_t,count_t>::tally(const std::vector<value_t>& ii)
-{ 
+tallyman_vec<value_t,count_t>::tally(std::vector<value_t> &&ii)
+{
     for (auto i : ii)
-        tally(i); 
+        tally(i);
+}
+
+template<typename value_t, typename count_t>
+inline void
+tallyman_vec<value_t,count_t>::tally(const std::vector<value_t>& ii)
+{
+    for (auto i : ii)
+        tally(i);
 }
 
 template<typename value_t, typename count_t>
@@ -265,10 +276,18 @@ tallyman_map<value_t,count_t>::tally(value_t i)
 
 template<typename value_t, typename count_t>
 inline void
-tallyman_map<value_t,count_t>::tally(const std::vector<value_t>& ii)
-{ 
+tallyman_map<value_t,count_t>::tally(std::vector<value_t> &&ii)
+{
     for (auto i : ii)
-        tally(i); 
+        tally(i);
+}
+
+template<typename value_t, typename count_t>
+inline void
+tallyman_map<value_t,count_t>::tally(const std::vector<value_t>& ii)
+{
+    for (auto i : ii)
+        tally(i);
 }
 
 template<typename value_t, typename count_t>

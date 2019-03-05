@@ -97,6 +97,7 @@ class kmer_counter
         bool single_strand() const { return s_strand_; }
 
         virtual void process(const std::string& data) = 0;
+        virtual void process(std::string &&data) = 0;
         virtual std::ostream& write_results(std::ostream& os, unsigned = output_opts::none) const = 0;
 };
 
@@ -128,6 +129,7 @@ class kmer_counter_impl : public kmer_counter<count_t>
         virtual ~kmer_counter_impl() { }
 
         virtual void process(const std::string& data);
+        virtual void process(std::string &&data);
         virtual std::ostream& write_results(std::ostream& os, unsigned = output_opts::none) const;
 
     private:
@@ -183,6 +185,14 @@ kmer_counter_impl<kmer_t,count_t>::kmer_counter_impl(int ksize, bool s_strand, i
 template <typename kmer_t,typename count_t>
 void
 kmer_counter_impl<kmer_t,count_t>::process(const std::string& data)
+{
+    std::vector<kmer_t> kmers = codec_.encode(data);
+    tallyman_->tally(kmers);
+}
+
+template <typename kmer_t,typename count_t>
+void
+kmer_counter_impl<kmer_t,count_t>::process(std::string &&data)
 {
     std::vector<kmer_t> kmers = codec_.encode(data);
     tallyman_->tally(kmers);

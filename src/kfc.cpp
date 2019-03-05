@@ -165,7 +165,7 @@ int main (int, char *argv[])
         sequence seq;
 
         while (reader.next(seq))
-            counter->process(seq.data);
+            counter->process(std::move(seq.data));
 
         in_file.close();
 

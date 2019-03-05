@@ -64,6 +64,7 @@ class kmer_codec {
         kmer_t encode_base(char) const;
         kmer_t encode_kmer(std::string::const_iterator) const;
         std::vector<kmer_t> encode(const std::string&) const;
+        std::vector<kmer_t> encode(std::string&&) const;
 
         std::string decode(kmer_t, bool rc = false) const;
 };
@@ -173,6 +174,13 @@ kmer_codec<kmer_t>::encode(const std::string& s) const
     }
 
     return result;
+}
+
+template <typename kmer_t>
+std::vector<kmer_t>
+kmer_codec<kmer_t>::encode(std::string &&s) const
+{
+    return encode(s);
 }
 
 template <typename kmer_t>

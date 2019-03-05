@@ -109,7 +109,7 @@ class tallyman_vec : public tallyman<value_t,count_t>
         tallyman_vec<value_t,count_t>& operator=(const tallyman_vec&) = delete;
         virtual ~tallyman_vec<value_t,count_t>() { if (vec_) free(vec_); }
 
-	virtual void tally(const std::vector<value_t>& ii) { for (auto i : ii) tally(i); }
+	virtual void tally(const std::vector<value_t>& ii);
 
         virtual bool is_vec() const { return true; }
 
@@ -136,7 +136,7 @@ class tallyman_map : public tallyman<value_t,count_t>
         tallyman_map<value_t,count_t>(const tallyman_map<value_t,count_t>&) = delete;
         tallyman_map<value_t,count_t>& operator=(const tallyman_map<value_t,count_t>&) = delete;
 
-        virtual void tally(const std::vector<value_t>& ii) { for (auto i : ii) tally(i); }
+        virtual void tally(const std::vector<value_t>& ii);
 
         virtual bool is_map() const { return true; }
 
@@ -217,6 +217,37 @@ tallyman_map<value_t,count_t>::tallyman_map(int nbits)
 {
 }
 
+// tallyman_vec --------------------------------------------------------------
+
+template<typename value_t, typename count_t>
+inline void
+tallyman_vec<value_t,count_t>::tally(value_t i)
+{
+    if (i > tallyman<value_t,count_t>::max_value_)
+        ++tallyman<value_t,count_t>::n_invalid_;
+    else
+        ++vec_[i];
+}
+
+template<typename value_t, typename count_t>
+inline void
+tallyman_vec<value_t,count_t>::tally(const std::vector<value_t>& ii)
+{ 
+    for (auto i : ii)
+        tally(i); 
+}
+
+template<typename value_t, typename count_t>
+const std::map<value_t,count_t>&
+tallyman_vec<value_t,count_t>::get_results_map() const
+{
+    static std::map<value_t,count_t> dummy;
+    raise_error("invalid invocation: get_results_map on vec implementation");
+    return dummy;
+}
+
+// tallyman_map --------------------------------------------------------------
+
 template<typename value_t, typename count_t>
 inline void
 tallyman_map<value_t,count_t>::tally(value_t i)
@@ -234,12 +265,10 @@ tallyman_map<value_t,count_t>::tally(value_t i)
 
 template<typename value_t, typename count_t>
 inline void
-tallyman_vec<value_t,count_t>::tally(value_t i)
-{
-    if (i > tallyman<value_t,count_t>::max_value_)
-        ++tallyman<value_t,count_t>::n_invalid_;
-    else
-        ++vec_[i];
+tallyman_map<value_t,count_t>::tally(const std::vector<value_t>& ii)
+{ 
+    for (auto i : ii)
+        tally(i); 
 }
 
 template<typename value_t, typename count_t>
@@ -248,15 +277,6 @@ tallyman_map<value_t,count_t>::get_results_vec() const
 {
     raise_error("invalid invocation: get_results_vec on map implementation");
     return 0;
-}
-
-template<typename value_t, typename count_t>
-const std::map<value_t,count_t>&
-tallyman_vec<value_t,count_t>::get_results_map() const
-{
-    static std::map<value_t,count_t> dummy;
-    raise_error("invalid invocation: get_results_map on vec implementation");
-    return dummy;
 }
 
 

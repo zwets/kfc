@@ -1,3 +1,4 @@
+- Optimise choice between vec and map
 - Add threaded execution
 - Add OpenCL backend (if faster)
 

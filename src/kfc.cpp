@@ -16,7 +16,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <stdexcept>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -87,103 +86,96 @@ int main (int, char *argv[])
 
     set_progname("kfc");
 
-    try {
-            // Parse arguments
+        // Parse arguments
 
-        while (*++argv && **argv == '-' && (*argv)[1] != '\0')
-        {
-            char opt = (*argv)[1];
+    while (*++argv && **argv == '-' && (*argv)[1] != '\0')
+    {
+        char opt = (*argv)[1];
 
-            if (opt == '-' && (*argv)[2] == '\0') {
-                ++argv;            // double dash marks end of options
-                break;
-            }
-            else if (opt == 'v') {
-                set_verbose(true);
-            }
-            else if (opt == 's') {
-                single_strand = true;
-            }
-            else if (opt == 'x') {
-                kmer_32bit = true;
-            }
-            else if (opt == 'n') {
-                o_opts |= output_opts::no_dna;
-            }
-            else if (opt == 'z') {
-                o_opts |= output_opts::zeros;
-            }
-            else if (opt == 'i') {
-                o_opts |= output_opts::invalids;
-            }
-            else if (opt == 'q') {
-                o_opts |= output_opts::no_headers;
-            }
-            else if (!*++argv) {    // subsequent options require argument
-                usage_exit();
-            }
-            else if (opt == 'k') {
-                ksize = std::atoi(*argv);
-                if (ksize < 1 || ksize > MAX_KSIZE) 
-                    raise_error("invalid k-mer size: %s", *argv);
-            }
-            else if (opt == 'm') {
-                if ((max_mem = std::atoi(*argv)) < 1)
-                    raise_error("invalid memory size: %s", *argv);
-            }
-            else if (opt == 't') {
-                if ((n_threads = std::atoi(*argv)) < 1)
-                    raise_error("invalid number of threads: %s", *argv);
-            }
-            else
-                usage_exit();
+        if (opt == '-' && (*argv)[2] == '\0') {
+            ++argv;            // double dash marks end of options
+            break;
+        }
+        else if (opt == 'v') {
+            set_verbose(true);
+        }
+        else if (opt == 's') {
+            single_strand = true;
+        }
+        else if (opt == 'x') {
+            kmer_32bit = true;
+        }
+        else if (opt == 'n') {
+            o_opts |= output_opts::no_dna;
+        }
+        else if (opt == 'z') {
+            o_opts |= output_opts::zeros;
+        }
+        else if (opt == 'i') {
+            o_opts |= output_opts::invalids;
+        }
+        else if (opt == 'q') {
+            o_opts |= output_opts::no_headers;
+        }
+        else if (!*++argv) {    // subsequent options require argument
+            usage_exit();
+        }
+        else if (opt == 'k') {
+            ksize = std::atoi(*argv);
+            if (ksize < 1 || ksize > MAX_KSIZE) 
+                raise_error("invalid k-mer size: %s", *argv);
+        }
+        else if (opt == 'm') {
+            if ((max_mem = std::atoi(*argv)) < 1)
+                raise_error("invalid memory size: %s", *argv);
+        }
+        else if (opt == 't') {
+            if ((n_threads = std::atoi(*argv)) < 1)
+                raise_error("invalid number of threads: %s", *argv);
+        }
+        else
+            usage_exit();
+    }
+
+        // Create the kmer_counter
+
+    // It seems the 32-bit count_t is faster than the fast32
+    //
+    //std::unique_ptr<kmer_counter_Q> counter(kmer_counter_Q::create(ksize, single_strand, max_mem, kmer_32bit, n_threads));
+    std::unique_ptr<kmer_counter_S> counter(kmer_counter_S::create(ksize, single_strand, max_mem, kmer_32bit, n_threads));
+
+        // Iterate over files
+
+    std::string fname(*argv ? *argv++ : "-");
+
+    do {
+        verbose_emit("reading file: %s", fname.c_str());
+
+        std::istream *is = &std::cin;
+
+        std::ifstream in_file;
+        if (fname != "-") {
+            in_file.open(fname, std::ios_base::in|std::ios_base::binary);
+            if (!in_file)
+                raise_error("failed to open file: %s", fname.c_str());
+            is = &in_file;
         }
 
-            // Create the kmer_counter
+        sequence_reader reader(*is);
+        sequence seq;
 
-        // It seems the 32-bit count_t is faster than the fast32
-        //
-        //std::unique_ptr<kmer_counter_Q> counter(kmer_counter_Q::create(ksize, single_strand, max_mem, kmer_32bit, n_threads));
-        std::unique_ptr<kmer_counter_S> counter(kmer_counter_S::create(ksize, single_strand, max_mem, kmer_32bit, n_threads));
+        while (reader.next(seq))
+            counter->process(seq.data);
 
-            // Iterate over files
+        in_file.close();
 
-        std::string fname(*argv ? *argv++ : "-");
+        fname = *argv ? *argv++ : "";
 
-        do {
-            verbose_emit("reading file: %s", fname.c_str());
+    } while (!fname.empty());
 
-            std::istream *is = &std::cin;
+        // Output kmer_counter results
 
-            std::ifstream in_file;
-            if (fname != "-") {
-                in_file.open(fname, std::ios_base::in|std::ios_base::binary);
-                if (!in_file)
-                    raise_error("failed to open file: %s", fname.c_str());
-                is = &in_file;
-            }
-
-            sequence_reader reader(*is);
-            sequence seq;
-
-            while (reader.next(seq))
-                counter->process(seq.data);
-
-            in_file.close();
-
-            fname = *argv ? *argv++ : "";
-
-        } while (!fname.empty());
-
-            // Output kmer_counter results
-
-        counter->write_results(std::cout, o_opts);
-
-    }
-    catch (std::runtime_error e) {
-        std::cerr << std::endl << "khc: " << e.what() << std::endl;
-        return 1;
-    }
+    counter->write_results(std::cout, o_opts);
 
     return 0;
 }

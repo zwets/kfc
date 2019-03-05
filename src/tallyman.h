@@ -86,8 +86,8 @@ class tallyman {
         virtual const count_t *get_results_vec() const = 0;
         virtual const std::map<value_t,count_t>& get_results_map() const = 0;
 
-        value_t max_value() { return max_value_; }
-        count_t invalid_count() { return n_invalid_; }
+        value_t max_value() const { return max_value_; }
+        count_t invalid_count() const { return n_invalid_; }
 };
 
 template <typename value_t, typename count_t>

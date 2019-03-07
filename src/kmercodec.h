@@ -63,7 +63,7 @@ class kmer_codec {
 
         kmer_t max_kmer() const { return max_kmer_; }
 
-        kmer_t encode_base(char) const;
+        inline kmer_t encode_base(char) const;
         kmer_t encode_kmer(std::string::const_iterator) const;
 
         void encode(const std::string&, kmer_t*) const;
@@ -73,6 +73,10 @@ class kmer_codec {
         std::vector<kmer_t> encode(std::string&&) const;
 
         std::string decode(kmer_t, bool rc = false) const;
+
+    private:
+        void rolling_encode(std::vector<kmer_t>&, std::string::const_iterator, std::string::const_iterator) const;
+        kmer_t chomp_invalids(std::vector<kmer_t>&, std::string::const_iterator&, std::string::const_iterator) const;
 };
 
 
@@ -97,7 +101,7 @@ kmer_codec<kmer_t>::kmer_codec(int ksize, bool sstrand)
 }
 
 template <typename kmer_t>
-kmer_t
+inline kmer_t
 kmer_codec<kmer_t>::encode_base(char c) const
 {
     constexpr static kmer_t X = kmer_codec<kmer_t>::invalid_kmer;
@@ -180,12 +184,68 @@ kmer_codec<kmer_t>::encode(std::string &&s, kmer_t* t) const
 }
 
 template <typename kmer_t>
+kmer_t
+kmer_codec<kmer_t>::chomp_invalids(std::vector<kmer_t>& result, std::string::const_iterator &p, std::string::const_iterator pend) const
+{
+    kmer_t kmer = invalid_kmer;
+
+    while (kmer == invalid_kmer && p != pend) {
+
+        std::string::const_iterator pchk = p + ksize_;
+
+        while (encode_base(*--pchk) != invalid_kmer)
+            if (pchk == p) {        // we made it without invalids, so p is good
+                kmer = encode_kmer(p++);  // encode it, add it, and move p forward
+                result.push_back(kmer);
+                break;              // so end with p at next starting point
+            }
+
+        if (kmer == invalid_kmer) { // pck has poison base, fill invalids up to it
+            if (pchk >= pend)
+                pchk = pend - 1;    // the last possible invalid is one before pend
+            do {                    // add an invalid for p upto and including pchk
+                result.push_back(kmer);
+            } while (p++ != pchk);  // and end with p++ just beyond pchk
+        }
+    }
+
+    return kmer;
+}
+
+template <typename kmer_t>
+void
+kmer_codec<kmer_t>::rolling_encode(std::vector<kmer_t>& result, std::string::const_iterator pbegin, std::string::const_iterator pend) const
+    // Note: - pend is one past the last kmer starting position, not one past the end of string (which is kmer chars further)
+    //       - in other words, we must encode exactly one kmer for each of [pbegin,pend)
+    //       - this method is private, we may assume that it is called with pbegin < pend
+{
+    std::string::const_iterator p = pbegin;
+    kmer_t kmer = chomp_invalids(result, p /*ref*/, pend);
+
+    while (p != pend) {
+        
+        kmer_t new_base = encode_base(p[ksize_-1]);
+
+        if (new_base == invalid_kmer) {
+            kmer = chomp_invalids(result, p, pend);
+        }
+        else { // new base is good
+            kmer <<= 2;        
+            kmer |= new_base;
+            kmer &= max_kmer_;
+            result.push_back(kmer);
+            ++p;
+        }
+    }
+}
+
+template <typename kmer_t>
 std::vector<kmer_t>
 kmer_codec<kmer_t>::encode(const std::string& s) const
 {
     std::vector<kmer_t> result;
 
-    // a string of size n produces n+1-k kmers
+    // a string of length s produces n=s+1-k kmers
     size_t n = s.size() + 1;
 
     if (static_cast<size_t>(ksize_) < n)
@@ -194,11 +254,14 @@ kmer_codec<kmer_t>::encode(const std::string& s) const
 
         result.reserve(n);
 
-        std::string::const_iterator pcur = s.cbegin();
-        std::string::const_iterator pend = pcur + n;
+        std::string::const_iterator pcur = s.cbegin(); // first
+        std::string::const_iterator pend = pcur + n;   // one past
 
-        while (pcur != pend)
-            result.push_back(encode_kmer(pcur++));
+        if (sstrand_)
+            rolling_encode(result, pcur, pend);
+        else
+            while (pcur != pend)
+                result.push_back(encode_kmer(pcur++));
     }
 
     return result;

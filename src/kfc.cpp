@@ -42,7 +42,6 @@ static const char USAGE[] = "\n"
 "   -i        include the invalid k-mer count in the output (default stderr)\n"
 "   -q        suppress output headers\n"
 "   -m MEM    constrain memory use to about MEM GB (default: all minus 2GB)\n"
-"   -t NUM    use NUM threads (default: all system threads)\n"
 "   -x        force k-mers in 32-bits (you normally won't need this option)\n"
 "   -v        produce verbose output to stderr\n"
 "\n"
@@ -128,10 +127,6 @@ int main (int, char *argv[])
         else if (opt == 'm') {
             if ((max_mem = std::atoi(*argv)) < 1)
                 raise_error("invalid memory size: %s", *argv);
-        }
-        else if (opt == 't') {
-            if ((n_threads = std::atoi(*argv)) < 1)
-                raise_error("invalid number of threads: %s", *argv);
         }
         else
             usage_exit();

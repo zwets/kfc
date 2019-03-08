@@ -18,6 +18,7 @@
 
 #include <gtest/gtest.h>
 #include "kmercodec.h"
+#include "utils.h"
 
 using namespace kfc;
 
@@ -39,8 +40,18 @@ static std::uint64_t invalid64 = kmer_codec<std::uint64_t>::invalid_kmer;
 
 // sizes and limits -----------------------------------------------------
 
+static codec32* make_codec32(int ksize, bool sstrand = false)
+{
+    codec32 *p;
+//    std::cerr << "make_codec32(" << ksize << "," << sstrand << ")" << std::endl;
+//    std::cerr.flush();
+    p = new codec32(ksize, sstrand);
+//    std::cerr << "c.max_kmer() = " << p->max_kmer() << std::endl;
+    return p;
+}
+
 TEST(kmercodec_test, no_ksize_zero) {
-    EXPECT_DEATH(new codec32(0), ".*");
+    EXPECT_DEATH({ codec32 c(0); }, ".*");
 }
 
 TEST(kmercodec_test, no_ksize_16) {
@@ -76,7 +87,6 @@ TEST(kmercodec_test, no_ksize_even) {
 TEST(kmercodec_test, ksize_even_ss) {
     codec32(6, true);
 }
-
 
 // decoding -------------------------------------------------------------
 

@@ -348,6 +348,9 @@ TEST(kmercounter_test, counter32_1kbase_rc) {
     c2->write_results(ss2, output_opts::no_headers|output_opts::invalids);
     
     ASSERT_EQ(ss1.str(), ss2.str());
+
+    delete c1;
+    delete c2;
 }
 
 TEST(kmercounter_test, counter64_1kbase_rc) {
@@ -365,6 +368,9 @@ TEST(kmercounter_test, counter64_1kbase_rc) {
     c2->write_results(ss2, output_opts::no_headers|output_opts::invalids);
     
     ASSERT_EQ(ss1.str(), ss2.str());
+
+    delete c1;
+    delete c2;
 }
 
 

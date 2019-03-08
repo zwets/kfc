@@ -20,7 +20,6 @@
 
 #include <string>
 #include <vector>
-#include <algorithm>
 #include "utils.h"
 
 namespace kfc {
@@ -61,8 +60,6 @@ class kmer_codec {
 
     public:
         explicit kmer_codec(int ksize, bool sstrand = false);
-        kmer_codec(const kmer_codec<kmer_t>&) = delete;
-        kmer_codec& operator=(const kmer_codec<kmer_t>&) = delete;
 
         kmer_t max_kmer() const { return max_kmer_; }
 
@@ -83,8 +80,10 @@ class kmer_codec {
 
 template <typename kmer_t>
 kmer_codec<kmer_t>::kmer_codec(int ksize, bool sstrand)
-    : ksize_(ksize), sstrand_(sstrand), max_kmer_((static_cast<kmer_t>(1)<<(2*ksize-(sstrand?0:1)))-1)
+    : ksize_(ksize), sstrand_(sstrand), max_kmer_(0)
 {
+    //std::cerr << "kmer_codec<" << (sizeof(kmer_t)*8) << ">(" << ksize << "," << sstrand << ")" << std::endl;
+
     if (ksize < 1)
         raise_error("invalid k-mer size: %d", ksize);
 
@@ -93,6 +92,8 @@ kmer_codec<kmer_t>::kmer_codec(int ksize, bool sstrand)
 
     if (!sstrand && (ksize & 0x1) != 0x1)
         raise_error("k-mer size must be odd for canonical encoding");
+
+    max_kmer_ = (static_cast<kmer_t>(1) << (2*ksize-(sstrand?0:1))) - 1;
 }
 
 template <typename kmer_t>

@@ -45,10 +45,10 @@ else
 endif
 
 TEST_OBJS = \
-	kmercounter-test.o \
-	kmercodec-test.o \
+	seqreader-test.o \
 	tallyman-test.o \
-	seqreader-test.o
+	kmercodec-test.o \
+	kmercounter-test.o \
 
 # Build targets.
 

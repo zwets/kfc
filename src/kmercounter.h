@@ -21,6 +21,7 @@
 #include <string>
 #include <ostream>
 #include <memory>
+#include <algorithm>
 #include "tallyman.h"
 #include "kmercodec.h"
 

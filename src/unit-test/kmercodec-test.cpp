@@ -40,7 +40,7 @@ static std::uint64_t invalid64 = kmer_codec<std::uint64_t>::invalid_kmer;
 // sizes and limits -----------------------------------------------------
 
 TEST(kmercodec_test, no_ksize_zero) {
-    EXPECT_DEATH(codec32(0), ".*");
+    EXPECT_DEATH(new codec32(0), ".*");
 }
 
 TEST(kmercodec_test, no_ksize_16) {
@@ -76,6 +76,7 @@ TEST(kmercodec_test, no_ksize_even) {
 TEST(kmercodec_test, ksize_even_ss) {
     codec32(6, true);
 }
+
 
 // decoding -------------------------------------------------------------
 

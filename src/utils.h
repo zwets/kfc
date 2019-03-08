@@ -25,7 +25,7 @@ namespace kfc {
 extern void raise_error(const char* t, ...);
 
 extern void set_progname(const char *name);
-extern void set_verbose(bool verbose);
+extern bool set_verbose(bool verbose);
 extern void emit(const char* t, ...);
 extern void verbose_emit(const char* t, ...);
 

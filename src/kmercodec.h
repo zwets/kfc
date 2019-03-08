@@ -20,6 +20,7 @@
 
 #include <string>
 #include <vector>
+#include <algorithm>
 #include "utils.h"
 
 namespace kfc {
@@ -60,9 +61,17 @@ class kmer_codec {
 
     public:
         explicit kmer_codec(int ksize, bool sstrand = false);
+        kmer_codec(const kmer_codec<kmer_t>&) = delete;
+        kmer_codec& operator=(const kmer_codec<kmer_t>&) = delete;
+
+        kmer_t max_kmer() const { return max_kmer_; }
 
         kmer_t encode_base(char) const;
         kmer_t encode_kmer(std::string::const_iterator) const;
+
+        void encode(const std::string&, kmer_t*) const;
+        void encode(std::string&&, kmer_t*) const;
+
         std::vector<kmer_t> encode(const std::string&) const;
         std::vector<kmer_t> encode(std::string&&) const;
 
@@ -152,6 +161,24 @@ kmer_codec<kmer_t>::encode_kmer(const std::string::const_iterator pcur) const
 }
 
 template <typename kmer_t>
+void
+kmer_codec<kmer_t>::encode(const std::string& s, kmer_t* t) const
+{
+    std::string::const_iterator pcur = s.cbegin();
+    std::string::const_iterator pend = pcur + s.size() + 1 - ksize_;
+
+    while (pcur < pend)
+        *t++ = encode_kmer(pcur++);
+}
+
+template <typename kmer_t>
+void
+kmer_codec<kmer_t>::encode(std::string &&s, kmer_t* t) const
+{
+    return encode((const std::string&)s, t);
+}
+
+template <typename kmer_t>
 std::vector<kmer_t>
 kmer_codec<kmer_t>::encode(const std::string& s) const
 {
@@ -170,7 +197,7 @@ kmer_codec<kmer_t>::encode(const std::string& s) const
         std::string::const_iterator pend = pcur + n;
 
         while (pcur != pend)
-            result.emplace_back(encode_kmer(pcur++));
+            result.push_back(encode_kmer(pcur++));
     }
 
     return result;

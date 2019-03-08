@@ -24,56 +24,59 @@ using namespace kfc;
 
 namespace {
 
-typedef kmer_counter<std::uint32_t> counter32; // count_t 32-bits
+typedef kmer_counter_list<std::uint32_t> counter32list; // kmer_t 32, count_t 32
+typedef kmer_counter_list<std::uint64_t> counter64list; // kmer_t 32, count_t 32
 typedef kmer_counter_tally<std::uint32_t,std::uint32_t> counter32tally; // kmer_t 32, count_t 32
-
-typedef kmer_counter<std::uint64_t> counter64;
 typedef kmer_counter_tally<std::uint64_t,std::uint32_t> counter64tally; // kmer_t 32, count_t 32
 
 
 // sizes and limits -----------------------------------------------------
 
 TEST(kmercounter_test, no_ksize_zero) {
-    EXPECT_DEATH(counter32::create(0), ".*");
+    EXPECT_DEATH(kmer_counter::create(0), ".*");
 }
 
 TEST(kmercounter_test, ksize_1) {
-    counter32::create(1);
-    counter32::create(1, true);
+    delete(kmer_counter::create(1));
+    delete(kmer_counter::create(1, true));
 }
 
 TEST(kmercounter_test, no_ksize_16) {
-    EXPECT_DEATH(counter32tally::create(16), ".*");
+    EXPECT_DEATH(counter32tally::create(16,false,0,0), ".*");
+    EXPECT_DEATH(counter32list::create(16,false,0,0,0), ".*");
 }
 
 TEST(kmercounter_test, no_ksize_16_ss) {
-    EXPECT_DEATH(counter32tally(16, true, 0, 0), ".*");
+    EXPECT_DEATH(counter32tally(16, true,0,0), ".*");
+    EXPECT_DEATH(counter32list(16, true,0,0,0), ".*");
 }
 
 TEST(kmercounter_test, ksize_15) {
-    counter32::create(15);
-    counter32::create(15, true);
+    delete(kmer_counter::create(15));
+    delete(kmer_counter::create(15,true));
 }
 
 TEST(kmercounter_test, no_ksize_32) {
-    EXPECT_DEATH(counter64::create(32), ".*");
+    EXPECT_DEATH(counter32tally(32,false,0,0), ".*");
+    EXPECT_DEATH(counter32list(32,false,0,0,0), ".*");
 }
 
 TEST(kmercounter_test, no_ksize_32_ss) {
-    EXPECT_DEATH(counter64::create(32, true), ".*");
+    EXPECT_DEATH(counter32tally(32,true,0,0), ".*");
+    EXPECT_DEATH(counter32list(32,true,0,0,0), ".*");
 }
 
 TEST(kmercounter_test, ksize_31) {
-    counter64::create(31);
-    counter64::create(31, true);
+    delete(kmer_counter::create(31));
+    delete(kmer_counter::create(31, true));
 }
 
 TEST(kmercounter_test, no_ksize_even) {
-    EXPECT_DEATH(counter32::create(6), ".*");
+    EXPECT_DEATH(kmer_counter::create(6), ".*");
 }
 
 TEST(kmercounter_test, ksize_even_ss) {
-    counter32::create(6, true);
+    delete(kmer_counter::create(6, true));
 }
 
 // decoding -------------------------------------------------------------
@@ -82,7 +85,7 @@ static unsigned std_opts = output_opts::no_headers;
 static unsigned with_zeros = std_opts | output_opts::zeros;
 static unsigned with_invalids = std_opts | output_opts::invalids;
 
-static int result_line_count(counter32& c, std::string s, unsigned o = std_opts)
+static int result_line_count(kmer_counter& c, std::string s, unsigned o = std_opts)
 {
     int count = 0; char buf[10240]; std::stringstream ss;
 
@@ -193,7 +196,7 @@ TEST(kmercounter_test, reverse_long) {
 
 TEST(kmercounter_test, encode_ksize_15) {
     char seq[] = "gaatctgcccagcac";
-    counter32 *c = counter32::create(15, false);
+    kmer_counter *c = kmer_counter::create(15, false);
     c->process(seq);
 
     std::stringstream ss;
@@ -212,7 +215,7 @@ TEST(kmercounter_test, encode_ksize_15) {
 
 TEST(kmercounter_test, encode_ksize_15_ss) {
     char seq[] = "gaatctgcccagcac";
-    counter32 *c = counter32::create(15, true);
+    kmer_counter *c = kmer_counter::create(15, true);
     c->process(seq);
 
     std::stringstream ss;
@@ -231,7 +234,7 @@ TEST(kmercounter_test, encode_ksize_15_ss) {
 
 TEST(kmercounter_test, encode_ksize_15_1gb) {
     char seq[] = "gaatctgcccagcac";
-    counter32 *c = counter32::create(15, false, 1);
+    kmer_counter *c = kmer_counter::create(15, false, 1);
     c->process(seq);
 
     std::stringstream ss;
@@ -250,7 +253,7 @@ TEST(kmercounter_test, encode_ksize_15_1gb) {
 
 TEST(kmercounter_test, encode_ksize_15_ss_1gb) {
     char seq[] = "gaatctgcccagcac";
-    counter32 *c = counter32::create(15, true, 1);
+    kmer_counter *c = kmer_counter::create(15, true, 1);
     c->process(seq);
 
     std::stringstream ss;
@@ -269,7 +272,7 @@ TEST(kmercounter_test, encode_ksize_15_ss_1gb) {
 
 TEST(kmercounter_test, encode_ksize_31) {
     char seq[] = "taagcgtttgctatgccatcccatcgggcca"; 
-    counter64 *c = counter64::create(31, false);
+    kmer_counter *c = kmer_counter::create(31, false);
     c->process(seq);
 
     std::stringstream ss;
@@ -288,7 +291,7 @@ TEST(kmercounter_test, encode_ksize_31) {
 
 TEST(kmercounter_test, encode_ksize_31_ss) {
     char seq[] = "taagcgtttgctatgccatcccatcgggcca"; 
-    counter64 *c = counter64::create(31, true);
+    kmer_counter *c = kmer_counter::create(31, true);
     c->process(seq);
 
     std::stringstream ss;
@@ -332,8 +335,8 @@ static const char rc_dna[KBASE+1] =
 
 TEST(kmercounter_test, counter32_1kbase_rc) {
 
-    counter32 *c1 = counter32::create(15, false, 1);
-    counter32 *c2 = counter32::create(15, false, 1);
+    kmer_counter *c1 = kmer_counter::create(15, false, 1);
+    kmer_counter *c2 = kmer_counter::create(15, false, 1);
 
     c1->process(dna);
     c2->process(rc_dna);
@@ -341,16 +344,16 @@ TEST(kmercounter_test, counter32_1kbase_rc) {
     std::stringstream ss1;
     std::stringstream ss2;
 
-    c1->write_results(ss1);
-    c2->write_results(ss2, output_opts::invalids);
+    c1->write_results(ss1, output_opts::no_headers);
+    c2->write_results(ss2, output_opts::no_headers|output_opts::invalids);
     
     ASSERT_EQ(ss1.str(), ss2.str());
 }
 
 TEST(kmercounter_test, counter64_1kbase_rc) {
 
-    counter64 *c1 = counter64::create(31, false, 1);
-    counter64 *c2 = counter64::create(31, false, 1);
+    kmer_counter *c1 = kmer_counter::create(31, false, 1);
+    kmer_counter *c2 = kmer_counter::create(31, false, 1);
 
     c1->process(dna);
     c2->process(rc_dna);
@@ -358,8 +361,8 @@ TEST(kmercounter_test, counter64_1kbase_rc) {
     std::stringstream ss1;
     std::stringstream ss2;
 
-    c1->write_results(ss1);
-    c2->write_results(ss2, output_opts::invalids);
+    c1->write_results(ss1, output_opts::no_headers);
+    c2->write_results(ss2, output_opts::no_headers|output_opts::invalids);
     
     ASSERT_EQ(ss1.str(), ss2.str());
 }

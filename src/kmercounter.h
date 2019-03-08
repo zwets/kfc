@@ -28,24 +28,8 @@ namespace kfc {
 
 
 // Forward declarations
-template <typename count_t> class kmer_counter;
+class kmer_counter;
 template <typename kmer_t, typename count_t> class kmer_counter_tally;
-
-
-// kmer_counter_{L,Q,S,D} - convenience typedefs for kmer_counter with different
-// count_t data types.  The count_t type tallies kmer hits, and must be small
-// to save on memory, but large enough to not overflow.  It can be integral
-// or floating point, though the latter is likely slower.
-//
-// - L: if there could ever be more than 4G occurrences of a single kmer
-// - Q: if you value speed at the cost of possible larger memory consumption
-// - S: if you value low memory consumption over possible faster speed
-// - D: if you want to try using a double for keeping count
-//
-typedef kmer_counter<std::uint_fast64_t> kmer_counter_L;
-typedef kmer_counter<std::uint_fast32_t> kmer_counter_Q;
-typedef kmer_counter<std::uint32_t>      kmer_counter_S;
-typedef kmer_counter<double>             kmer_counter_D;
 
 
 // output_opts - bit field flag for kmer_counter<>::write_results()
@@ -64,33 +48,35 @@ enum output_opts : unsigned {
 // Perform any number of calls to process(seq), then invoke write_results()
 // to output the detected kmers and their counts.
 //
-// This class has two implementations: one fits ksize up to 15 (32-bits), the
-// other fits ksize up to 31 (64-bits).  The static create() factory method
-// chooses between these depending on ksize and the k32_bit parameter.
+// This class has three implementations: two based on tallying the kmers as
+// they are processed, of which one uses a vector of tallies and one uses a
+// map of kmer to tally, and one which does not tally but collects the list
+// of kmers as is, then sorts this when results are requested.
 //
-// By default, if ksize is small, it picks std::uint_fast32_t which may mean
-// it uses 64-bit.  With k32_bit = true, it forces 32-bit.  Note however that
-// the bit-size of kmer_t isn't as impactful on memory as count_t.
+// The count_t parameter determines the size of the counts that can be kept,
+// and has memory impact: factor 2 with k-space for the vector implementation,
+// factor 2 with k-count for the map, none for the list.
+//
+// The kmer_t parameter has impact factor 2 with k-count for both map and list,
+// none for vector.  When k-size > 15, then it must be 64-bit.  For smaller
+// k-size, the default is type std::uint_fast32_t, which may well be 64-bit.
+// In this case, 32 can be forced by setting k32_bit true.
 //
 // The tallyman component in the implementation classes encapsulates further
 // optimisations for speed and memory consumption; see tallyman.h for details.
 //
-template <typename count_t>
 class kmer_counter
 {
-    static_assert(std::is_integral<count_t>::value || std::is_floating_point<count_t>::value,
-            "template argument count_t must be a numerical type");
-
     protected:
         int ksize_;
         bool s_strand_;
-        int n_threads_;
+        unsigned n_threads_;
 
     public:
-        static kmer_counter<count_t>* create(int ksize, bool s_strand = false, int max_gb = 0, bool k32_bit = false, int n_threads = 0);
+        static kmer_counter* create(int ksize, bool s_strand = false, unsigned min_mcap = 0, unsigned max_gb = 0, bool k32_bit = false, unsigned n_threads = 0);
 
     public:
-        kmer_counter(int ksize, bool s_strand, int n_threads);
+        kmer_counter(int ksize, bool s_strand, unsigned n_threads);
         virtual ~kmer_counter() { }
 
         int ksize() const { return ksize_; }
@@ -108,7 +94,7 @@ class kmer_counter
 // directly if you know your ksize ahead of time that ksize will not exceed kmer_codec<kmer_t>::max_ksize.
 
 template <typename kmer_t, typename count_t>
-class kmer_counter_tally : public kmer_counter<count_t>
+class kmer_counter_tally : public kmer_counter
 {
     static_assert(std::is_unsigned<kmer_t>::value,
             "template argument kmer_t must be unsigned integral");
@@ -123,7 +109,7 @@ class kmer_counter_tally : public kmer_counter<count_t>
         kmer_codec<kmer_t> codec_;
 
     public:
-	kmer_counter_tally(int ksize, bool s_strand, int mem_gb, int n_threads);
+	kmer_counter_tally(int ksize, bool s_strand, unsigned mem_gb, unsigned n_threads);
         kmer_counter_tally(const kmer_counter_tally<kmer_t,count_t>&) = delete;
         kmer_counter_tally& operator=(const kmer_counter_tally<kmer_t,count_t>&) = delete;
         virtual ~kmer_counter_tally() { }
@@ -138,32 +124,72 @@ class kmer_counter_tally : public kmer_counter<count_t>
 };
 
 
+// kmer_counter_list ------------------------------------------------------------
+//
+// This implementation does not keep tallies but instead keeps the list of kmers
+// as they are coming in.  When write_results is called, the list is sorted and
+// counted kmers are output.
+
+template <typename kmer_t>
+class kmer_counter_list : public kmer_counter
+{
+    static_assert(std::is_unsigned<kmer_t>::value,
+            "template argument kmer_t must be unsigned integral");
+
+    public:
+        constexpr static int max_ksize = kmer_codec<kmer_t>::max_ksize;
+
+    private:
+        kmer_t *kmers_, *pkmers_cur_, *pkmers_end_;
+        kmer_codec<kmer_t> codec_;
+
+    public:
+	kmer_counter_list(int ksize, bool s_strand, unsigned min_mcap, unsigned max_gb, unsigned n_threads);
+        kmer_counter_list(const kmer_counter_list<kmer_t>&) = delete;
+        kmer_counter_list& operator=(const kmer_counter_list<kmer_t>&) = delete;
+        virtual ~kmer_counter_list() { if (kmers_) free(kmers_); }
+
+        virtual void process(const std::string& data);
+        virtual void process(std::string &&data);
+        virtual std::ostream& write_results(std::ostream& os, unsigned = output_opts::none) const;
+};
+
 // kmer_counter factory  --------------------------------------------------------
 
-template <typename count_t>
-kmer_counter<count_t>* kmer_counter<count_t>::create(int ksize, bool s_strand, int max_gb, bool k32_bit, int n_threads)
+kmer_counter* kmer_counter::create(int ksize, bool s_strand, unsigned min_mcap, unsigned max_gb, bool k32_bit, unsigned n_threads)
 {
-    kmer_counter<count_t> *ret = 0;
+    typedef typename std::uint32_t tally_count_t;
+
+    kmer_counter *ret = 0;
 
     if (ksize < 1)
         raise_error("invalid k-mer size: %d", ksize);
-    else if (ksize <= kmer_counter_tally<std::uint32_t,count_t>::max_ksize)
-        if (k32_bit)
-            ret = new kmer_counter_tally<std::uint32_t,count_t>(ksize, s_strand, max_gb, n_threads);
+    else if (true /* TODO */)
+        if (ksize <= kmer_counter_list<std::uint32_t>::max_ksize)
+            if (k32_bit)
+                ret = new kmer_counter_list<std::uint32_t>(ksize, s_strand, min_mcap, max_gb, n_threads);
+            else
+                ret = new kmer_counter_list<std::uint_fast32_t>(ksize, s_strand, min_mcap, max_gb, n_threads);
+        else if (ksize <= kmer_counter_list<std::uint64_t>::max_ksize)
+            ret = new kmer_counter_list<std::uint64_t>(ksize, s_strand, min_mcap, max_gb, n_threads);
         else
-            ret = new kmer_counter_tally<std::uint_fast32_t,count_t>(ksize, s_strand, max_gb, n_threads);
-    else if (ksize <= kmer_counter_tally<std::uint64_t,count_t>::max_ksize)
-        ret = new kmer_counter_tally<std::uint64_t,count_t>(ksize, s_strand, max_gb, n_threads);
+            raise_error("k-mer size %d is not supported, maximum is %d", ksize, kmer_counter_list<std::uint64_t>::max_ksize);
+    else if (ksize <= kmer_counter_tally<std::uint32_t,tally_count_t>::max_ksize)
+        if (k32_bit)
+            ret = new kmer_counter_tally<std::uint32_t,tally_count_t>(ksize, s_strand, max_gb, n_threads);
+        else
+            ret = new kmer_counter_tally<std::uint_fast32_t,tally_count_t>(ksize, s_strand, max_gb, n_threads);
+    else if (ksize <= kmer_counter_tally<std::uint64_t,tally_count_t>::max_ksize)
+        ret = new kmer_counter_tally<std::uint64_t,tally_count_t>(ksize, s_strand, max_gb, n_threads);
     else
-        raise_error("k-mer size %d is not supported, maximum is %d", ksize, kmer_counter_tally<std::uint64_t,count_t>::max_ksize);
+        raise_error("k-mer size %d is not supported, maximum is %d", ksize, kmer_counter_tally<std::uint64_t,tally_count_t>::max_ksize);
 
     return ret;
 }
 
 // kmer_counter methods -------------------------------------------------------
 
-template <typename count_t>
-kmer_counter<count_t>::kmer_counter(int ksize, bool s_strand, int n_threads)
+kmer_counter::kmer_counter(int ksize, bool s_strand, unsigned n_threads)
     : ksize_(ksize), s_strand_(s_strand), n_threads_(n_threads)
 {
     if (ksize < 1)
@@ -173,8 +199,8 @@ kmer_counter<count_t>::kmer_counter(int ksize, bool s_strand, int n_threads)
 // kmer_counter_tally methods --------------------------------------------------
 
 template <typename kmer_t,typename count_t>
-kmer_counter_tally<kmer_t,count_t>::kmer_counter_tally(int ksize, bool s_strand, int mem_gb, int n_threads)
-    : kmer_counter<count_t>(ksize, s_strand, n_threads),
+kmer_counter_tally<kmer_t,count_t>::kmer_counter_tally(int ksize, bool s_strand, unsigned mem_gb, unsigned n_threads)
+    : kmer_counter(ksize, s_strand, n_threads),
       tallyman_(tallyman<kmer_t,count_t>::create(2*ksize-(s_strand?0:1), mem_gb)),
       codec_(ksize, s_strand)
 {
@@ -210,12 +236,9 @@ kmer_counter_tally<kmer_t, count_t>::write_results(std::ostream &os, unsigned op
     bool do_invalid = (opts & output_opts::invalids) != 0;
     bool do_zeros = (opts & output_opts::zeros) != 0;
 
-    int k = kmer_counter<count_t>::ksize_;
-    bool s = kmer_counter<count_t>::s_strand_;
+    int k = kmer_counter::ksize_;
+    bool s = kmer_counter::s_strand_;
     count_t n_invalid = tallyman_->invalid_count();
-
-    if (n_invalid && !do_invalid)
-        emit("counted %lu invalid k-mers", static_cast<unsigned long>(n_invalid));
 
     if (do_headers) {
         // Line 1
@@ -243,12 +266,14 @@ kmer_counter_tally<kmer_t, count_t>::write_results(std::ostream &os, unsigned op
     if (do_invalid && (n_invalid || do_zeros)) {
         if (do_dna)
             os << "invalid\t";
-        os << tallyman_->max_value() + 1 << '\t' << n_invalid << std::endl;
+        os << codec_.max_kmer() + 1 << '\t' << n_invalid << std::endl;
     }
+
+    if (n_invalid)
+        verbose_emit("counted %lu invalid k-mers", static_cast<unsigned long>(n_invalid));
 
     return os;
 }
-
 
 template <typename kmer_t, typename count_t>
 void
@@ -306,6 +331,178 @@ kmer_counter_tally<kmer_t, count_t>::write_map_results(std::ostream &os, bool dn
             }
         }
     }
+}
+
+
+// kmer_counter_list methods --------------------------------------------------
+
+template <typename kmer_t>
+kmer_counter_list<kmer_t>::kmer_counter_list(int ksize, bool s_strand, unsigned min_mcap, unsigned max_gb, unsigned n_threads)
+    : kmer_counter(ksize, s_strand, n_threads),
+      kmers_(0), pkmers_cur_(0), pkmers_end_(0),
+      codec_(ksize, s_strand)
+{
+    if (ksize > max_ksize)
+        raise_error("k-mer size %d too large for this impl (max %d)", ksize, max_ksize);
+
+    size_t max_mb = static_cast<size_t>(max_gb) << 10;
+    verbose_emit("max_mb = %lu", static_cast<unsigned long>(max_mb));
+
+    if (max_mb == 0) {
+        size_t phy_mb = get_system_memory() >> 20;
+        max_mb = phy_mb > 2048 ? phy_mb - 2048 : phy_mb;
+        verbose_emit("defaulting max memory to all%s physical memory: %uG",
+                phy_mb > 2048 ? " but 2G" : "", static_cast<unsigned>(max_mb >> 10));
+    }
+
+    size_t alloc_size = max_mb << 20;
+    size_t max_kmers = alloc_size / sizeof(kmer_t);
+
+    verbose_emit("maximum capacity: %uM kmers", static_cast<unsigned>(max_kmers >> 20));
+
+    if (static_cast<size_t>(min_mcap) << 20 > max_kmers)
+        raise_error("insufficient memory (%uG) for %uM k-mers, maximum is %uM", 
+                static_cast<unsigned>(max_mb >> 10), min_mcap, static_cast<unsigned>(max_kmers >> 20));
+
+    kmers_ = (kmer_t*) std::malloc(alloc_size);
+    if (kmers_) {
+        pkmers_cur_ = kmers_;
+        pkmers_end_ = kmers_ + max_kmers;
+    }
+    else
+        raise_error("failed to allocate memory (%uMB) for k-mer list",
+                static_cast<unsigned>(alloc_size >> 20));
+}
+
+template <typename kmer_t>
+void
+kmer_counter_list<kmer_t>::process(const std::string& data)
+{
+    size_t len = data.size() + 1;
+    if (static_cast<size_t>(ksize_) < len)
+        len -= ksize_;
+
+    kmer_t *new_pcur = pkmers_cur_ + len;
+
+    if (new_pcur > pkmers_end_)
+        raise_error("k-mer list capacity (%uM k-mers) exhausted",
+                static_cast<unsigned>((pkmers_end_ - kmers_) >> 20));
+
+    if (new_pcur <= pkmers_end_) {
+        // first bump set the new pcur to later let next thread enter
+        kmer_t *encode_ptr = pkmers_cur_;
+        pkmers_cur_ = new_pcur;
+        codec_.encode(data, encode_ptr);
+    }
+}
+
+template <typename kmer_t>
+void
+kmer_counter_list<kmer_t>::process(std::string &&data)
+{
+    process((const std::string&)data); 
+}
+
+template <typename kmer_t>
+std::ostream&
+kmer_counter_list<kmer_t>::write_results(std::ostream &os, unsigned opts) const
+{
+    // // shrink memory to be nice (can't here, we're const)
+    //
+    // size_t cur_count = pkmers_cur_ - kmers_;
+    // kmers_ = (kmer_t*) std::realloc(kmers_, cur_count * sizeof(kmer_t));
+    // pkmers_cur_ = pkmers_end_ = kmers_ + cur_count;
+
+    if (!os)
+        return os;
+
+    bool do_headers = (opts & output_opts::no_headers) == 0;
+    bool do_dna = (opts & output_opts::no_dna) == 0;
+    bool do_invalid = (opts & output_opts::invalids) != 0;
+    bool do_zeros = (opts & output_opts::zeros) != 0;
+
+    //int k = kmer_counter<count_t>::ksize_;
+    //bool s = kmer_counter<count_t>::s_strand_;
+    int k = kmer_counter::ksize_;
+    bool s = kmer_counter::s_strand_;
+
+    std::uint64_t n_invalid = 0;
+
+    if (do_headers) {
+        // Line 1
+        os << "# kfc " << k << "-mer counts "
+            << (s ? "(single strand directional)": "(canonical, destranded)" );
+        if (!do_invalid) // if !do_invalid then show in header
+            os << "; excluding invalid k-mers";
+        if (!do_zeros)
+            os << "; omitting zero counts";
+        os << std::endl;
+        // Line 2
+        os << "#";
+        if (do_dna) os << "k-mer\t";
+        os << (s ? "s-code" : "c-code") << '\t' << "count" << std::endl;
+    }
+
+    kmer_t *p = kmers_;
+
+    if (p && p != pkmers_cur_) {
+
+        std::sort(kmers_, pkmers_cur_);
+
+        kmer_t last = *p;
+        std::uint64_t count = 1;
+
+        if (do_zeros)
+            for (kmer_t i = 0; i < last; ++i) {
+                if (do_dna)
+                    os << codec_.decode(i) << '\t';
+                os << i << '\t' << 0 << std::endl;
+            }
+
+        while (++p != pkmers_cur_) {
+            if (*p == last)
+                ++count;
+            else {
+                if (do_dna)
+                    os << codec_.decode(last) << '\t';
+                os << last << '\t' << count << std::endl;
+
+                if (do_zeros)
+                    while (++last != *p) {
+                        if (do_dna)
+                            os << codec_.decode(last) << '\t';
+                        os << last << '\t' << 0 << std::endl;
+                    }
+
+                last = *p;
+                count = 1;
+            }
+        }
+
+        if (do_dna)
+            os << codec_.decode(last) << '\t';
+        os << last << '\t' << count << std::endl;
+
+        if (do_zeros)
+            while (++last <= codec_.max_kmer()) {
+                if (do_dna)
+                    os << codec_.decode(last) << '\t';
+                os << last << '\t' << 0 << std::endl;
+            }
+    }
+
+    if (do_invalid && (n_invalid || do_zeros)) {
+        if (do_dna)
+            os << "invalid\t";
+        os << codec_.max_kmer() + 1 << '\t' << n_invalid << std::endl;
+    }
+
+    if (n_invalid) {
+        verbose_emit("counted %lu k-mers, %lu invalid", 
+                static_cast<unsigned long>(pkmers_cur_ - kmers_), static_cast<unsigned long>(n_invalid));
+    }
+
+    return os;
 }
 
 

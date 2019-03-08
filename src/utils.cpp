@@ -37,10 +37,12 @@ set_progname(const char *p)
         progname = p;
 }
 
-void
+bool
 set_verbose(bool v)
 {
+    bool old_verbose = verbose;
     verbose = v;
+    return old_verbose;
 }
 
 void

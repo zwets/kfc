@@ -41,6 +41,7 @@ static const char USAGE[] = "\n"
 "   -z        include k-mers with a zero count in the output (default omitted)\n"
 "   -i        include the invalid k-mer count in the output (default stderr)\n"
 "   -q        suppress output headers\n"
+"   -l MAX    constrain capacity to around MAX million bases/kmers total\n"
 "   -m MEM    constrain memory use to about MEM GB (default: all minus 2GB)\n"
 "   -x        force k-mers in 32-bits (you normally won't need this option)\n"
 "   -v        produce verbose output to stderr\n"
@@ -79,7 +80,8 @@ int main (int, char *argv[])
     int ksize = DEFAULT_KSIZE;
     bool single_strand = false;
     int max_mem = 0;
-    int kmer_32bit = false;
+    int min_mcap = 0;
+    int kmer_32b = false;
     int n_threads = 0;
     unsigned o_opts = output_opts::none;
 
@@ -102,7 +104,7 @@ int main (int, char *argv[])
             single_strand = true;
         }
         else if (opt == 'x') {
-            kmer_32bit = true;
+            kmer_32b = true;
         }
         else if (opt == 'n') {
             o_opts |= output_opts::no_dna;
@@ -124,6 +126,10 @@ int main (int, char *argv[])
             if (ksize < 1 || ksize > MAX_KSIZE) 
                 raise_error("invalid k-mer size: %s", *argv);
         }
+        else if (opt == 'l') {
+            if ((min_mcap = std::atoi(*argv)) < 1)
+                raise_error("invalid capacity limit: %s", *argv);
+        }
         else if (opt == 'm') {
             if ((max_mem = std::atoi(*argv)) < 1)
                 raise_error("invalid memory size: %s", *argv);
@@ -136,8 +142,8 @@ int main (int, char *argv[])
 
     // It seems the 32-bit count_t is faster than the fast32
     //
-    //std::unique_ptr<kmer_counter_Q> counter(kmer_counter_Q::create(ksize, single_strand, max_mem, kmer_32bit, n_threads));
-    std::unique_ptr<kmer_counter_S> counter(kmer_counter_S::create(ksize, single_strand, max_mem, kmer_32bit, n_threads));
+    //std::unique_ptr<kmer_counter_F> counter(kmer_counter_F::create(ksize, single_strand, max_mem, kmer_32bit, n_threads));
+    std::unique_ptr<kmer_counter> counter(kmer_counter::create(ksize, single_strand, min_mcap, max_mem, kmer_32b, n_threads));
 
         // Iterate over files
 

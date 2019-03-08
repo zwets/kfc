@@ -29,7 +29,7 @@ namespace kfc {
 
 // Forward declarations
 template <typename count_t> class kmer_counter;
-template <typename kmer_t, typename count_t> class kmer_counter_impl;
+template <typename kmer_t, typename count_t> class kmer_counter_tally;
 
 
 // kmer_counter_{L,Q,S,D} - convenience typedefs for kmer_counter with different
@@ -102,13 +102,13 @@ class kmer_counter
 };
 
 
-// kmer_counter_impl ----------------------------------------------------------
+// kmer_counter_tally ----------------------------------------------------------
 //
 // Implements kmer_counter for a given kmer_t.  You can instantiate this class
 // directly if you know your ksize ahead of time that ksize will not exceed kmer_codec<kmer_t>::max_ksize.
 
 template <typename kmer_t, typename count_t>
-class kmer_counter_impl : public kmer_counter<count_t>
+class kmer_counter_tally : public kmer_counter<count_t>
 {
     static_assert(std::is_unsigned<kmer_t>::value,
             "template argument kmer_t must be unsigned integral");
@@ -123,10 +123,10 @@ class kmer_counter_impl : public kmer_counter<count_t>
         kmer_codec<kmer_t> codec_;
 
     public:
-	kmer_counter_impl(int ksize, bool s_strand, int mem_gb, int n_threads);
-        kmer_counter_impl(const kmer_counter_impl<kmer_t,count_t>&) = delete;
-        kmer_counter_impl& operator=(const kmer_counter_impl<kmer_t,count_t>&) = delete;
-        virtual ~kmer_counter_impl() { }
+	kmer_counter_tally(int ksize, bool s_strand, int mem_gb, int n_threads);
+        kmer_counter_tally(const kmer_counter_tally<kmer_t,count_t>&) = delete;
+        kmer_counter_tally& operator=(const kmer_counter_tally<kmer_t,count_t>&) = delete;
+        virtual ~kmer_counter_tally() { }
 
         virtual void process(const std::string& data);
         virtual void process(std::string &&data);
@@ -147,15 +147,15 @@ kmer_counter<count_t>* kmer_counter<count_t>::create(int ksize, bool s_strand, i
 
     if (ksize < 1)
         raise_error("invalid k-mer size: %d", ksize);
-    else if (ksize <= kmer_counter_impl<std::uint32_t,count_t>::max_ksize)
+    else if (ksize <= kmer_counter_tally<std::uint32_t,count_t>::max_ksize)
         if (k32_bit)
-            ret = new kmer_counter_impl<std::uint32_t,count_t>(ksize, s_strand, max_gb, n_threads);
+            ret = new kmer_counter_tally<std::uint32_t,count_t>(ksize, s_strand, max_gb, n_threads);
         else
-            ret = new kmer_counter_impl<std::uint_fast32_t,count_t>(ksize, s_strand, max_gb, n_threads);
-    else if (ksize <= kmer_counter_impl<std::uint64_t,count_t>::max_ksize)
-        ret = new kmer_counter_impl<std::uint64_t,count_t>(ksize, s_strand, max_gb, n_threads);
+            ret = new kmer_counter_tally<std::uint_fast32_t,count_t>(ksize, s_strand, max_gb, n_threads);
+    else if (ksize <= kmer_counter_tally<std::uint64_t,count_t>::max_ksize)
+        ret = new kmer_counter_tally<std::uint64_t,count_t>(ksize, s_strand, max_gb, n_threads);
     else
-        raise_error("k-mer size %d is not supported, maximum is %d", ksize, kmer_counter_impl<std::uint64_t,count_t>::max_ksize);
+        raise_error("k-mer size %d is not supported, maximum is %d", ksize, kmer_counter_tally<std::uint64_t,count_t>::max_ksize);
 
     return ret;
 }
@@ -170,10 +170,10 @@ kmer_counter<count_t>::kmer_counter(int ksize, bool s_strand, int n_threads)
         raise_error("invalid k-mer size: %d", ksize);
 }
 
-// kmer_counter_impl methods --------------------------------------------------
+// kmer_counter_tally methods --------------------------------------------------
 
 template <typename kmer_t,typename count_t>
-kmer_counter_impl<kmer_t,count_t>::kmer_counter_impl(int ksize, bool s_strand, int mem_gb, int n_threads)
+kmer_counter_tally<kmer_t,count_t>::kmer_counter_tally(int ksize, bool s_strand, int mem_gb, int n_threads)
     : kmer_counter<count_t>(ksize, s_strand, n_threads),
       tallyman_(tallyman<kmer_t,count_t>::create(2*ksize-(s_strand?0:1), mem_gb)),
       codec_(ksize, s_strand)
@@ -184,7 +184,7 @@ kmer_counter_impl<kmer_t,count_t>::kmer_counter_impl(int ksize, bool s_strand, i
 
 template <typename kmer_t,typename count_t>
 void
-kmer_counter_impl<kmer_t,count_t>::process(const std::string& data)
+kmer_counter_tally<kmer_t,count_t>::process(const std::string& data)
 {
     std::vector<kmer_t> kmers = codec_.encode(data);
     tallyman_->tally(kmers);
@@ -192,7 +192,7 @@ kmer_counter_impl<kmer_t,count_t>::process(const std::string& data)
 
 template <typename kmer_t,typename count_t>
 void
-kmer_counter_impl<kmer_t,count_t>::process(std::string &&data)
+kmer_counter_tally<kmer_t,count_t>::process(std::string &&data)
 {
     std::vector<kmer_t> kmers = codec_.encode(data);
     tallyman_->tally(kmers);
@@ -200,7 +200,7 @@ kmer_counter_impl<kmer_t,count_t>::process(std::string &&data)
 
 template <typename kmer_t, typename count_t>
 std::ostream&
-kmer_counter_impl<kmer_t, count_t>::write_results(std::ostream &os, unsigned opts) const
+kmer_counter_tally<kmer_t, count_t>::write_results(std::ostream &os, unsigned opts) const
 {
     if (!os)
         return os;
@@ -252,7 +252,7 @@ kmer_counter_impl<kmer_t, count_t>::write_results(std::ostream &os, unsigned opt
 
 template <typename kmer_t, typename count_t>
 void
-kmer_counter_impl<kmer_t, count_t>::write_vec_results(std::ostream &os, const count_t *pdata, const count_t *pend, bool dna, bool zeros) const
+kmer_counter_tally<kmer_t, count_t>::write_vec_results(std::ostream &os, const count_t *pdata, const count_t *pend, bool dna, bool zeros) const
 {
     const count_t *p = pdata - 1;
     kmer_t kmer = 0;
@@ -268,7 +268,7 @@ kmer_counter_impl<kmer_t, count_t>::write_vec_results(std::ostream &os, const co
 
 template <typename kmer_t, typename count_t>
 void
-kmer_counter_impl<kmer_t, count_t>::write_map_results(std::ostream &os, bool dna, bool zeros) const
+kmer_counter_tally<kmer_t, count_t>::write_map_results(std::ostream &os, bool dna, bool zeros) const
 {
     const std::map<kmer_t,count_t>& map = tallyman_->get_results_map();
 

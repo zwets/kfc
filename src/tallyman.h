@@ -39,13 +39,15 @@ namespace kfc {
 //
 // The tallyman::create(nbits,max_gb) factory method returns the vector
 // implementation if it fits in max_gb memory, or else the map implementation.
+// This policy may be non-optimal, especially when the number of tallies is
+// not large, as random vector access for a large vector gives low cache hits.
 //
 // The core operation is tally(items), which tallies each i in items by either
 // incrementing its item count, or incrementing the invalid_count if i exceeds
 // max_value, the largest possible nbit number.
 //
 // Template parameter value_t must be an unsigned integral type of at least
-// nbits bits (or an exception is thrown).  If its bit size equals nbits, then
+// nbits bits (or the program exits).  If its bit size equals nbits, then
 // by definition invalid_count will remain 0, as no item can exceed max_value.
 //
 // Template parameter count_t can be any numeric type, though integral types
@@ -56,7 +58,7 @@ namespace kfc {
 // The get_results_X() members return the tallied counts.  For performance
 // reasons, these members do not shield from the underlying implementation
 // (vector or map).  Use the is_vec() and is_map() selectors to find out
-// which get_results_X() is applicable to the actual class.
+// whether get_results_vec() or get_results_map() should be called.
 //
 template <typename value_t, typename count_t>
 class tallyman {

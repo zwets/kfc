@@ -59,12 +59,17 @@ enum output_opts : unsigned {
 // factor 2 with k-count for the map, none for the list.
 //
 // The kmer_t parameter has impact factor 2 with k-count for both map and list,
-// none for vector.  When k-size > 15, then it must be 64-bit.  For smaller
-// k-size, the default is type std::uint_fast32_t, which may well be 64-bit.
-// In this case, 32 can be forced by setting k32_bit true.
+// none for vector.  When k-size > 15, then it must be 64-bit (as each base in
+// a k-mer takes up two bits and we reserve one for reporting invalid k-mers.
+// When k-size is 15 or below, then picking std::uint32_fast_t may give 64-bit
+// but could be faster than std::uint32_t which is guaranteed to be 32-bit.
 //
 // The tallyman component in the implementation classes encapsulates further
 // optimisations for speed and memory consumption; see tallyman.h for details.
+//
+// The static "create" factory method attempts to return the optimal
+// implementation class (vector, map, or list).  Actual performance is hard to
+// predict. @TODO@ add guidelines.
 //
 class kmer_counter
 {
@@ -157,6 +162,15 @@ class kmer_counter_list : public kmer_counter
 
 // kmer_counter factory  --------------------------------------------------------
 
+// The create factory method attempts to return the optimal (fastest) implementation
+// but YMMV in practice.  This is what it currently does:
+// - If k-size is small (up to 13): vector implementation
+// - Else if it is up to 15: list implementation with kmer_t 32-bit, except see below
+// - If it is up to 31: same but with kmer_t 64-but, except see below
+// - The EXCEPT is that if N (total number of kmers counted) would exceed available memory
+//   then it SHOULD (but does not currently) use map implementation
+//   The issue being that it can't know that ahead of time.
+//
 kmer_counter* kmer_counter::create(int ksize, bool s_strand, unsigned min_mcap, unsigned max_gb, bool k32_bit, unsigned n_threads)
 {
     typedef typename std::uint32_t tally_count_t;
@@ -165,25 +179,20 @@ kmer_counter* kmer_counter::create(int ksize, bool s_strand, unsigned min_mcap, 
 
     if (ksize < 1)
         raise_error("invalid k-mer size: %d", ksize);
-    else if (true /* TODO */)
-        if (ksize <= kmer_counter_list<std::uint32_t>::max_ksize)
-            if (k32_bit)
-                ret = new kmer_counter_list<std::uint32_t>(ksize, s_strand, min_mcap, max_gb, n_threads);
-            else
-                ret = new kmer_counter_list<std::uint_fast32_t>(ksize, s_strand, min_mcap, max_gb, n_threads);
-        else if (ksize <= kmer_counter_list<std::uint64_t>::max_ksize)
-            ret = new kmer_counter_list<std::uint64_t>(ksize, s_strand, min_mcap, max_gb, n_threads);
-        else
-            raise_error("k-mer size %d is not supported, maximum is %d", ksize, kmer_counter_list<std::uint64_t>::max_ksize);
-    else if (ksize <= kmer_counter_tally<std::uint32_t,tally_count_t>::max_ksize)
+    else if (ksize <= 14)
         if (k32_bit)
             ret = new kmer_counter_tally<std::uint32_t,tally_count_t>(ksize, s_strand, max_gb, n_threads);
         else
             ret = new kmer_counter_tally<std::uint_fast32_t,tally_count_t>(ksize, s_strand, max_gb, n_threads);
-    else if (ksize <= kmer_counter_tally<std::uint64_t,tally_count_t>::max_ksize)
-        ret = new kmer_counter_tally<std::uint64_t,tally_count_t>(ksize, s_strand, max_gb, n_threads);
+    else if (ksize <= kmer_counter_list<std::uint32_t>::max_ksize)
+        if (k32_bit)
+            ret = new kmer_counter_list<std::uint32_t>(ksize, s_strand, min_mcap, max_gb, n_threads);
+        else
+            ret = new kmer_counter_list<std::uint_fast32_t>(ksize, s_strand, min_mcap, max_gb, n_threads);
+    else if (ksize <= kmer_counter_list<std::uint64_t>::max_ksize)
+        ret = new kmer_counter_list<std::uint64_t>(ksize, s_strand, min_mcap, max_gb, n_threads);
     else
-        raise_error("k-mer size %d is not supported, maximum is %d", ksize, kmer_counter_tally<std::uint64_t,tally_count_t>::max_ksize);
+        raise_error("k-mer size %d is not supported, maximum is %d", ksize, kmer_counter_list<std::uint64_t>::max_ksize);
 
     return ret;
 }

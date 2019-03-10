@@ -335,8 +335,8 @@ static const char rc_dna[KBASE+1] =
 
 TEST(kmercounter_test, counter32_1kbase_rc) {
 
-    kmer_counter *c1 = kmer_counter::create(15, false, 1);
-    kmer_counter *c2 = kmer_counter::create(15, false, 1);
+    std::unique_ptr<kmer_counter> c1(kmer_counter::create(15, false, 1));
+    std::unique_ptr<kmer_counter> c2(kmer_counter::create(15, false, 1));
 
     c1->process(dna);
     c2->process(rc_dna);
@@ -348,15 +348,12 @@ TEST(kmercounter_test, counter32_1kbase_rc) {
     c2->write_results(ss2, output_opts::no_headers|output_opts::invalids);
     
     ASSERT_EQ(ss1.str(), ss2.str());
-
-    delete c1;
-    delete c2;
 }
 
 TEST(kmercounter_test, counter64_1kbase_rc) {
 
-    kmer_counter *c1 = kmer_counter::create(31, false, 1);
-    kmer_counter *c2 = kmer_counter::create(31, false, 1);
+    std::unique_ptr<kmer_counter> c1(kmer_counter::create(31, false, 1));
+    std::unique_ptr<kmer_counter> c2(kmer_counter::create(31, false, 1));
 
     c1->process(dna);
     c2->process(rc_dna);
@@ -368,9 +365,6 @@ TEST(kmercounter_test, counter64_1kbase_rc) {
     c2->write_results(ss2, output_opts::no_headers|output_opts::invalids);
     
     ASSERT_EQ(ss1.str(), ss2.str());
-
-    delete c1;
-    delete c2;
 }
 
 

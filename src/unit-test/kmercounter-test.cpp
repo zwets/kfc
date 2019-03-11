@@ -24,10 +24,10 @@ using namespace kfc;
 
 namespace {
 
-typedef kmer_counter_list<std::uint32_t> counter32list; // kmer_t 32, count_t 32
-typedef kmer_counter_list<std::uint64_t> counter64list; // kmer_t 32, count_t 32
+typedef kmer_counter_list<std::uint32_t> counter32list; // kmer_t 32
+typedef kmer_counter_list<std::uint64_t> counter64list; // kmer_t 64
 typedef kmer_counter_tally<std::uint32_t,std::uint32_t> counter32tally; // kmer_t 32, count_t 32
-typedef kmer_counter_tally<std::uint64_t,std::uint32_t> counter64tally; // kmer_t 32, count_t 32
+typedef kmer_counter_tally<std::uint64_t,std::uint32_t> counter64tally; // kmer_t 64, count_t 32
 
 
 // sizes and limits -----------------------------------------------------
@@ -101,33 +101,48 @@ TEST(kmercounter_test, process_1_a) {
     counter32tally c(1, false, 0, 0);
     EXPECT_EQ(result_line_count(c, "a"), 1);
     EXPECT_EQ(result_line_count(c, "a", with_zeros), 2);
+    counter32list l(1, false, 0, 0, 0);
+    EXPECT_EQ(result_line_count(l, "a"), 1);
+    EXPECT_EQ(result_line_count(l, "a", with_zeros), 2);
 }
 
 TEST(kmercounter_test, process_1_a_ss) {
     counter32tally c(1, true, 0, 0);
     EXPECT_EQ(result_line_count(c, "a"), 1);
     EXPECT_EQ(result_line_count(c, "a", with_zeros), 4);
+    counter32list l(1, true, 0, 0, 0);
+    EXPECT_EQ(result_line_count(l, "a"), 1);
+    EXPECT_EQ(result_line_count(l, "a", with_zeros), 4);
 }
 
 TEST(kmercounter_test, process_1_aa) {
     counter32tally c(1, false, 0, 0);
     EXPECT_EQ(result_line_count(c, "aa"), 1);
+    counter32list l(1, false, 0, 0, 0);
+    EXPECT_EQ(result_line_count(l, "aa"), 1);
 }
 
 TEST(kmercounter_test, process_1_ag) {
     counter32tally c(1, false, 0, 0);
     EXPECT_EQ(result_line_count(c, "ag"), 2);
     EXPECT_EQ(result_line_count(c, "ag", with_zeros), 2);
+    counter32list l(1, false, 0, 0, 0);
+    EXPECT_EQ(result_line_count(l, "ag"), 2);
+    EXPECT_EQ(result_line_count(l, "ag", with_zeros), 2);
 }
 
 TEST(kmercounter_test, process_1_at) {
     counter32tally c(1, false, 0, 0);
     EXPECT_EQ(result_line_count(c, "at"), 1);
+    counter32list l(1, false, 0, 0, 0);
+    EXPECT_EQ(result_line_count(l, "at"), 1);
 }
 
 TEST(kmercounter_test, process_1_at_ss) {
     counter32tally c(1, true, 0, 0);
     EXPECT_EQ(result_line_count(c, "at"), 2);
+    counter32list l(1, true, 0, 0, 0);
+    EXPECT_EQ(result_line_count(l, "at"), 2);
 }
 
 TEST(kmercounter_test, process_1_invalid) {
@@ -136,6 +151,11 @@ TEST(kmercounter_test, process_1_invalid) {
     EXPECT_EQ(result_line_count(c, "x", with_invalids), 1);
     EXPECT_EQ(result_line_count(c, "x", with_zeros), 2);
     EXPECT_EQ(result_line_count(c, "x", with_zeros|with_invalids), 3);
+    counter32list l(1, false, 0, 0, 0);
+    EXPECT_EQ(result_line_count(l, "x"), 0);
+    EXPECT_EQ(result_line_count(l, "x", with_invalids), 1);
+    EXPECT_EQ(result_line_count(l, "x", with_zeros), 2);
+    EXPECT_EQ(result_line_count(l, "x", with_zeros|with_invalids), 3);
 }
 
 TEST(kmercounter_test, process_1_invalid_ss) {
@@ -144,6 +164,11 @@ TEST(kmercounter_test, process_1_invalid_ss) {
     EXPECT_EQ(result_line_count(c, "x", with_invalids), 1);
     EXPECT_EQ(result_line_count(c, "x", with_zeros), 4);
     EXPECT_EQ(result_line_count(c, "x", with_zeros|with_invalids), 5);
+    counter32list l(1, true, 0, 0, 0);
+    EXPECT_EQ(result_line_count(l, "x"), 0);
+    EXPECT_EQ(result_line_count(l, "x", with_invalids), 1);
+    EXPECT_EQ(result_line_count(l, "x", with_zeros), 4);
+    EXPECT_EQ(result_line_count(l, "x", with_zeros|with_invalids), 5);
 }
 
 TEST(kmercounter_test, process_3_acgt) {
@@ -152,6 +177,11 @@ TEST(kmercounter_test, process_3_acgt) {
     EXPECT_EQ(result_line_count(c, "acgt", with_invalids), 1);
     EXPECT_EQ(result_line_count(c, "acgt", with_zeros), 32);
     EXPECT_EQ(result_line_count(c, "acgt", with_zeros|with_invalids), 33);
+    counter32list l(3, false, 0, 0, 0);
+    EXPECT_EQ(result_line_count(l, "acgt"), 1);
+    EXPECT_EQ(result_line_count(l, "acgt", with_invalids), 1);
+    EXPECT_EQ(result_line_count(l, "acgt", with_zeros), 32);
+    EXPECT_EQ(result_line_count(l, "acgt", with_zeros|with_invalids), 33);
 }
 
 TEST(kmercounter_test, process_3_acgt_ss) {
@@ -160,6 +190,11 @@ TEST(kmercounter_test, process_3_acgt_ss) {
     EXPECT_EQ(result_line_count(c, "acgt", with_invalids), 2);
     EXPECT_EQ(result_line_count(c, "acgt", with_zeros), 64);
     EXPECT_EQ(result_line_count(c, "acgt", with_zeros|with_invalids), 65);
+    counter32list l(3, true, 0, 0, 0);
+    EXPECT_EQ(result_line_count(l, "acgt"), 2);
+    EXPECT_EQ(result_line_count(l, "acgt", with_invalids), 2);
+    EXPECT_EQ(result_line_count(l, "acgt", with_zeros), 64);
+    EXPECT_EQ(result_line_count(l, "acgt", with_zeros|with_invalids), 65);
 }
 
 // encoding -------------------------------------------------------------

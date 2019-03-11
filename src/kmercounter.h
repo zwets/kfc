@@ -179,7 +179,7 @@ kmer_counter* kmer_counter::create(int ksize, bool s_strand, unsigned min_mcap, 
 
     if (ksize < 1)
         raise_error("invalid k-mer size: %d", ksize);
-    else if (ksize <= 14)
+    else if (ksize <= 13)
         if (k32_bit)
             ret = new kmer_counter_tally<std::uint32_t,tally_count_t>(ksize, s_strand, max_gb, n_threads);
         else
@@ -391,26 +391,27 @@ kmer_counter_list<kmer_t>::process(const std::string& data)
     size_t len = data.size() + 1;
     if (static_cast<size_t>(ksize_) < len)
         len -= ksize_;
+    else
+        return;
 
     kmer_t *new_pcur = pkmers_cur_ + len;
 
-    if (new_pcur > pkmers_end_)
-        raise_error("k-mer list capacity (%uM k-mers) exhausted",
-                static_cast<unsigned>((pkmers_end_ - kmers_) >> 20));
-
     if (new_pcur <= pkmers_end_) {
-        // first bump set the new pcur to later let next thread enter
+        // first bump the pcur, so later next thread can enter before encode
         kmer_t *encode_ptr = pkmers_cur_;
         pkmers_cur_ = new_pcur;
         codec_.encode(data, encode_ptr);
     }
+    else
+        raise_error("k-mer list capacity (%uM k-mers) exhausted",
+                static_cast<unsigned>((pkmers_end_ - kmers_) >> 20));
 }
 
 template <typename kmer_t>
 void
 kmer_counter_list<kmer_t>::process(std::string &&data)
 {
-    process((const std::string&)data); 
+    process(data);
 }
 
 template <typename kmer_t>
@@ -431,12 +432,8 @@ kmer_counter_list<kmer_t>::write_results(std::ostream &os, unsigned opts) const
     bool do_invalid = (opts & output_opts::invalids) != 0;
     bool do_zeros = (opts & output_opts::zeros) != 0;
 
-    //int k = kmer_counter<count_t>::ksize_;
-    //bool s = kmer_counter<count_t>::s_strand_;
-    int k = kmer_counter::ksize_;
-    bool s = kmer_counter::s_strand_;
-
-    std::uint64_t n_invalid = 0;
+    const size_t k = kmer_counter::ksize_;
+    const bool s = kmer_counter::s_strand_;
 
     if (do_headers) {
         // Line 1
@@ -453,57 +450,71 @@ kmer_counter_list<kmer_t>::write_results(std::ostream &os, unsigned opts) const
         os << (s ? "s-code" : "c-code") << '\t' << "count" << std::endl;
     }
 
+    std::uint64_t n_invalid = 0;
     kmer_t *p = kmers_;
 
     if (p && p != pkmers_cur_) {
 
         std::sort(kmers_, pkmers_cur_);
 
-        kmer_t last = *p;
-        std::uint64_t count = 1;
-
-        if (do_zeros)
-            for (kmer_t i = 0; i < last; ++i) {
-                if (do_dna)
-                    os << codec_.decode(i) << '\t';
-                os << i << '\t' << 0 << std::endl;
-            }
-
-        while (++p != pkmers_cur_) {
-            if (*p == last)
-                ++count;
-            else {
-                if (do_dna)
-                    os << codec_.decode(last) << '\t';
-                os << last << '\t' << count << std::endl;
-
-                if (do_zeros)
-                    while (++last != *p) {
-                        if (do_dna)
-                            os << codec_.decode(last) << '\t';
-                        os << last << '\t' << 0 << std::endl;
-                    }
-
-                last = *p;
-                count = 1;
-            }
+        if (*p == codec_.invalid_kmer) {
+            // we hit invalid right away, but since we're sorted
+            // this means we are done (invalid is beyond max)
+            n_invalid = pkmers_cur_ - p;
+            if (do_zeros)
+                for (kmer_t i = 0; i <= codec_.max_kmer(); ++i) {
+                    if (do_dna) os << codec_.decode(i) << '\t';
+                    os << i << '\t' << 0 << std::endl;
+                }
         }
+        else {
 
-        if (do_dna)
-            os << codec_.decode(last) << '\t';
-        os << last << '\t' << count << std::endl;
+            kmer_t last = *p;
+            std::uint64_t count = 1;
 
-        if (do_zeros)
-            while (++last <= codec_.max_kmer()) {
-                if (do_dna)
-                    os << codec_.decode(last) << '\t';
-                os << last << '\t' << 0 << std::endl;
+            // optionally generate zeros for kmers 0..last-1
+            if (do_zeros)
+                for (kmer_t i = 0; i < last; ++i) {
+                    if (do_dna) os << codec_.decode(i) << '\t';
+                    os << i << '\t' << 0 << std::endl;
+                }
+
+            while (++p != pkmers_cur_) {
+                if (*p == last) {   // continue run of last value
+                    ++count;
+                }
+                else if (*p == codec_.invalid_kmer) {
+                    n_invalid += pkmers_cur_ - p;
+                    break;
+                }
+                else {
+                    if (do_dna) os << codec_.decode(last) << '\t';
+                    os << last << '\t' << count << std::endl;
+
+                    if (do_zeros)
+                        while (++last != *p) {
+                            if (do_dna) os << codec_.decode(last) << '\t';
+                            os << last << '\t' << 0 << std::endl;
+                        }
+
+                    last = *p;
+                    count = 1;
+                }
             }
+
+            if (do_dna) os << codec_.decode(last) << '\t';
+            os << last << '\t' << count << std::endl;
+
+            if (do_zeros)
+                while (++last <= codec_.max_kmer()) {
+                    if (do_dna) os << codec_.decode(last) << '\t';
+                    os << last << '\t' << 0 << std::endl;
+                }
+        }
     }
 
     if (do_invalid && (n_invalid || do_zeros)) {
-        if (do_dna)
-            os << "invalid\t";
+        if (do_dna) os << "invalid\t";
         os << codec_.max_kmer() + 1 << '\t' << n_invalid << std::endl;
     }
 

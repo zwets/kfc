@@ -203,15 +203,21 @@ TEST(kmercounter_test, ksize_is_string) {
     counter32tally c(7, false, 0, 0);
     EXPECT_EQ(result_line_count(c, "acgtaaa", with_invalids), 1);
     EXPECT_EQ(result_line_count(c, "acgtaaa", with_zeros), 8192);
+    counter32list l(7, false, 0, 0, 0);
+    EXPECT_EQ(result_line_count(l, "acgtaaa", with_invalids), 1);
+    EXPECT_EQ(result_line_count(l, "acgtaaa", with_zeros), 8192);
 }
 
 TEST(kmercounter_test, ksize_longer_than_string) {
     counter32tally c(7, false, 0, 0);
     EXPECT_EQ(result_line_count(c, "xxxxxx", with_invalids), 0);
     EXPECT_EQ(result_line_count(c, "xxxxxx", with_zeros), 8192);
+    counter32list l(7, false, 0, 0, 0);
+    EXPECT_EQ(result_line_count(l, "xxxxxx", with_invalids), 0);
+    EXPECT_EQ(result_line_count(l, "xxxxxx", with_zeros), 8192);
 }
 
-TEST(kmercounter_test, reverse_long) {
+TEST(kmercounter_test, reverse_tally_long) {
     const int k = 7;
     counter32tally c1(k, false, 0, 0);
     counter32tally c2(k, false, 0, 0);
@@ -229,14 +235,31 @@ TEST(kmercounter_test, reverse_long) {
     ASSERT_EQ(r1.str(), r2.str());
 }
 
-TEST(kmercounter_test, encode_ksize_15) {
+TEST(kmercounter_test, reverse_list_long) {
+    const int k = 7;
+    counter32list c1(k, false, 0, 0, 0);
+    counter32list c2(k, false, 0, 0, 0);
+
+    char seq[] = "acgattagcgatagggt";
+    char rev[] = "accctatcgctaatcgt";
+
+    c1.process(seq);
+    c2.process(rev);
+
+    std::stringstream r1, r2;
+    c1.write_results(r1);
+    c2.write_results(r2);
+
+    ASSERT_EQ(r1.str(), r2.str());
+}
+
+TEST(kmercounter_test, encode_ksize_tally_15) {
     char seq[] = "gaatctgcccagcac";
-    kmer_counter *c = kmer_counter::create(15, false);
-    c->process(seq);
+    counter32tally c(15, false, 0, 0);
+    c.process(seq);
 
     std::stringstream ss;
-    c->write_results(ss, output_opts::no_headers);
-    delete c;
+    c.write_results(ss, output_opts::no_headers);
 
     std::string dna;
     std::uint64_t ccode;
@@ -248,14 +271,31 @@ TEST(kmercounter_test, encode_ksize_15) {
     ASSERT_EQ(count, 1);
 }
 
-TEST(kmercounter_test, encode_ksize_15_ss) {
+TEST(kmercounter_test, encode_ksize_list_15) {
     char seq[] = "gaatctgcccagcac";
-    kmer_counter *c = kmer_counter::create(15, true);
-    c->process(seq);
+    counter32list c(15, false, 0, 0, 0);
+    c.process(seq);
 
     std::stringstream ss;
-    c->write_results(ss, output_opts::no_headers);
-    delete c;
+    c.write_results(ss, output_opts::no_headers);
+
+    std::string dna;
+    std::uint64_t ccode;
+    std::uint64_t count;
+    ss >> dna >> ccode >> count;
+
+    ASSERT_EQ(dna, seq);
+    ASSERT_EQ(ccode, 0x106F5491);
+    ASSERT_EQ(count, 1);
+}
+
+TEST(kmercounter_test, encode_ksize_15_tally_ss) {
+    char seq[] = "gaatctgcccagcac";
+    counter32tally c(15, true, 0, 0);
+    c.process(seq);
+
+    std::stringstream ss;
+    c.write_results(ss, output_opts::no_headers);
 
     std::string dna;
     std::uint64_t ccode;
@@ -267,14 +307,31 @@ TEST(kmercounter_test, encode_ksize_15_ss) {
     ASSERT_EQ(count, 1);
 }
 
-TEST(kmercounter_test, encode_ksize_15_1gb) {
+TEST(kmercounter_test, encode_ksize_15_list_ss) {
     char seq[] = "gaatctgcccagcac";
-    kmer_counter *c = kmer_counter::create(15, false, 1);
-    c->process(seq);
+    counter32list c(15, true, 0, 0, 0);
+    c.process(seq);
 
     std::stringstream ss;
-    c->write_results(ss, output_opts::no_headers);
-    delete c;
+    c.write_results(ss, output_opts::no_headers);
+
+    std::string dna;
+    std::uint64_t ccode;
+    std::uint64_t count;
+    ss >> dna >> ccode >> count;
+
+    ASSERT_EQ(dna, seq);
+    ASSERT_EQ(ccode, 0x20DE5491);
+    ASSERT_EQ(count, 1);
+}
+
+TEST(kmercounter_test, encode_ksize_15_tally_1gb) {
+    char seq[] = "gaatctgcccagcac";
+    counter32tally c(15, false, 1, 0);
+    c.process(seq);
+
+    std::stringstream ss;
+    c.write_results(ss, output_opts::no_headers);
 
     std::string dna;
     std::uint64_t ccode;
@@ -288,12 +345,11 @@ TEST(kmercounter_test, encode_ksize_15_1gb) {
 
 TEST(kmercounter_test, encode_ksize_15_ss_1gb) {
     char seq[] = "gaatctgcccagcac";
-    kmer_counter *c = kmer_counter::create(15, true, 1);
-    c->process(seq);
+    counter32tally c(15, true, 1, 0);
+    c.process(seq);
 
     std::stringstream ss;
-    c->write_results(ss, output_opts::no_headers);
-    delete c;
+    c.write_results(ss, output_opts::no_headers);
 
     std::string dna;
     std::uint64_t ccode;
@@ -305,14 +361,13 @@ TEST(kmercounter_test, encode_ksize_15_ss_1gb) {
     ASSERT_EQ(count, 1);
 }
 
-TEST(kmercounter_test, encode_ksize_31) {
-    char seq[] = "taagcgtttgctatgccatcccatcgggcca"; 
-    kmer_counter *c = kmer_counter::create(31, false);
-    c->process(seq);
+TEST(kmercounter_test, encode_tally_ksize_31) {
+    char seq[] = "taagcgtttgctatgccatcccatcgggcca";
+    counter64tally c(31, false, 0, 0);
+    c.process(seq);
 
     std::stringstream ss;
-    c->write_results(ss, output_opts::no_headers);
-    delete c;
+    c.write_results(ss, output_opts::no_headers);
 
     std::string dna;
     std::uint64_t ccode;
@@ -324,14 +379,49 @@ TEST(kmercounter_test, encode_ksize_31) {
     ASSERT_EQ(count, 1);
 }
 
-TEST(kmercounter_test, encode_ksize_31_ss) {
-    char seq[] = "taagcgtttgctatgccatcccatcgggcca"; 
-    kmer_counter *c = kmer_counter::create(31, true);
-    c->process(seq);
+TEST(kmercounter_test, encode_list_ksize_31) {
+    char seq[] = "taagcgtttgctatgccatcccatcgggcca";
+    counter64list c(31, false, 0, 0, 0);
+    c.process(seq);
 
     std::stringstream ss;
-    c->write_results(ss, output_opts::no_headers);
-    delete c;
+    c.write_results(ss, output_opts::no_headers);
+
+    std::string dna;
+    std::uint64_t ccode;
+    std::uint64_t count;
+    ss >> dna >> ccode >> count;
+
+    ASSERT_EQ(dna, seq);
+    ASSERT_EQ(ccode, 0x184DFCE75354DA94);
+    ASSERT_EQ(count, 1);
+}
+
+TEST(kmercounter_test, encode_tally_ksize_31_ss) {
+    char seq[] = "taagcgtttgctatgccatcccatcgggcca";
+    counter64tally c(31, true, 0, 0);
+    c.process(seq);
+
+    std::stringstream ss;
+    c.write_results(ss, output_opts::no_headers);
+
+    std::string dna;
+    std::uint64_t ccode;
+    std::uint64_t count;
+    ss >> dna >> ccode >> count;
+
+    ASSERT_EQ(dna, seq);
+    ASSERT_EQ(ccode, 0x309BF9CE5354DA94);
+    ASSERT_EQ(count, 1);
+}
+
+TEST(kmercounter_test, encode_list_ksize_31_ss) {
+    char seq[] = "taagcgtttgctatgccatcccatcgggcca";
+    counter64list c(31, true, 0, 0, 0);
+    c.process(seq);
+
+    std::stringstream ss;
+    c.write_results(ss, output_opts::no_headers);
 
     std::string dna;
     std::uint64_t ccode;
@@ -344,7 +434,7 @@ TEST(kmercounter_test, encode_ksize_31_ss) {
 }
 
 const int KBASE = 1000;
-static const char dna[KBASE+1] = 
+static const char dna[KBASE+1] =
     "gtcagcataagattttgttacgctttcaatcctggagaacggctggccaggtagtgtgccaaaagagtgctgagtaagcgagagtgcgctggtgtgccta"
     "ttcgaaataagttttgcgagaatgctgtcaccatgggggactcatattgattagacgtatgaaggtttcgagttatttacgataaaagcaacttctgtag"
     "tcagtctcgagttgcgtcgaaccacttgtgcccacgtcattcctacgcgcttttcgcattgcttttccctgggtgtacatgtcgagacaatgtctagagg"
@@ -368,37 +458,71 @@ static const char rc_dna[KBASE+1] =
     "ctacagaagttgcttttatcgtaaataactcgaaaccttcatacgtctaatcaatatgagtcccccatggtgacagcattctcgcaaaacttatttcgaa"
     "taggcacaccagcgcactctcgcttactcagcactcttttggcacactacctggccagccgttctccaggattgaaagcgtaacaaaatcttatgctgac";
 
-TEST(kmercounter_test, counter32_1kbase_rc) {
+TEST(kmercounter_test, counter32_1kbase_crosscheck_rc) {
 
-    std::unique_ptr<kmer_counter> c1(kmer_counter::create(15, false, 1));
-    std::unique_ptr<kmer_counter> c2(kmer_counter::create(15, false, 1));
+    counter32tally c1(15, false, 1, 0);
+    counter32list c2(15, false, 0, 1, 0);
 
-    c1->process(dna);
-    c2->process(rc_dna);
+    c1.process(dna);
+    c2.process(rc_dna);
 
     std::stringstream ss1;
     std::stringstream ss2;
 
-    c1->write_results(ss1, output_opts::no_headers);
-    c2->write_results(ss2, output_opts::no_headers|output_opts::invalids);
-    
+    c1.write_results(ss1, output_opts::no_headers);
+    c2.write_results(ss2, output_opts::no_headers|output_opts::invalids);
+
     ASSERT_EQ(ss1.str(), ss2.str());
 }
 
-TEST(kmercounter_test, counter64_1kbase_rc) {
+TEST(kmercounter_test, counter64_1kbase_crosscheck_rc) {
 
-    std::unique_ptr<kmer_counter> c1(kmer_counter::create(31, false, 1));
-    std::unique_ptr<kmer_counter> c2(kmer_counter::create(31, false, 1));
+    counter64tally c1(31, false, 1, 0);
+    counter64list c2(31, false, 0, 1, 0);
 
-    c1->process(dna);
-    c2->process(rc_dna);
+    c1.process(dna);
+    c2.process(rc_dna);
 
     std::stringstream ss1;
     std::stringstream ss2;
 
-    c1->write_results(ss1, output_opts::no_headers);
-    c2->write_results(ss2, output_opts::no_headers|output_opts::invalids);
-    
+    c1.write_results(ss1, output_opts::no_headers);
+    c2.write_results(ss2, output_opts::no_headers|output_opts::invalids);
+
+    ASSERT_EQ(ss1.str(), ss2.str());
+}
+
+TEST(kmercounter_test, counter32_1kbase_crosscheck_ss) {
+
+    counter32tally c1(15, true, 1, 0);
+    counter32list c2(15, true, 0, 1, 0);
+
+    c1.process(dna);
+    c2.process(dna);
+
+    std::stringstream ss1;
+    std::stringstream ss2;
+
+    c1.write_results(ss1, output_opts::no_headers);
+    c2.write_results(ss2, output_opts::no_headers|output_opts::invalids);
+
+    ASSERT_EQ(ss1.str(), ss2.str());
+}
+
+TEST(kmercounter_test, counter64_1kbase_crosscheck_ss) {
+
+    counter64tally c1(31, true, 1, 0);
+    counter64list c2(31, true, 0, 1, 0);
+
+    c1.process(dna);
+    c2.process(dna);
+
+    std::stringstream ss1;
+    std::stringstream ss2;
+
+    c1.write_results(ss1, output_opts::no_headers);
+    c2.write_results(ss2, output_opts::no_headers|output_opts::invalids);
+
     ASSERT_EQ(ss1.str(), ss2.str());
 }
 

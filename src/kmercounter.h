@@ -512,6 +512,12 @@ kmer_counter_list<kmer_t>::write_results(std::ostream &os, unsigned opts) const
                 }
         }
     }
+    else if (do_zeros) {
+        for (kmer_t i = 0; i <= codec_.max_kmer(); ++i) {
+            if (do_dna) os << codec_.decode(i) << '\t';
+            os << i << '\t' << 0 << std::endl;
+        }
+    }
 
     if (do_invalid && (n_invalid || do_zeros)) {
         if (do_dna) os << "invalid\t";

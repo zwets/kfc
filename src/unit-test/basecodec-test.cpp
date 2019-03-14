@@ -1,4 +1,4 @@
-/* kmercodec-test.cpp
+/* basecodec-test.cpp
  * 
  * Copyright (C) 2018  Marco van Zwetselaar <io@zwets.it>
  *

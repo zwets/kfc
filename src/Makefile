@@ -4,7 +4,7 @@ OBJS = kfc.o seqreader.o utils.o
 
 LIBS =
 
-HDRS = kmercounter.h tallyman.h kmercodec.h seqreader.h utils.h
+HDRS = kmercounter.h tallyman.h kmercodec.h seqreader.h basecodec.h bitfiddle.h utils.h
 
 TARGET = kfc
 
@@ -31,4 +31,7 @@ test:
 
 %.o: %.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -c $<
+
+.cpp.s:
+	$(CXX) $(CXXFLAGS) -g -S $<
 

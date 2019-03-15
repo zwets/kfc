@@ -60,15 +60,22 @@ inline kmer_t encode_base(unsigned char c)
 }
 
 
-// decode_base - decode kmer_t value to base
-//
-// template parameters
-// - kmer_t - the type to encode into
+// decode_base - decode bottom two bits of kmer to base
 //
 template <typename kmer_t>
 inline char decode_base(kmer_t kmer)
 {
     constexpr static char kmer_bases[] = { 'a', 'c', 'g', 't' };
+    return kmer_bases[ kmer & 0x3 ];
+}
+
+
+// decode_comp_base - decode bottom two bits of kmer to complement of base
+//
+template <typename kmer_t>
+inline char decode_comp_base(kmer_t kmer)
+{
+    constexpr static char kmer_bases[] = { 't', 'g', 'c', 'a' };
     return kmer_bases[ kmer & 0x3 ];
 }
 

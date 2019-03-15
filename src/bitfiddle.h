@@ -26,18 +26,20 @@ namespace kfc {
 template <typename T>
 constexpr unsigned bitsize = 8 * sizeof(T);
 
-
 // low_bits - constant integral T with the N low bits set (N < bits in T)
 //
 template <typename T, unsigned N>
 constexpr T low_bits = (((T)1)<<N)-1;
 
+// high_bit - constant integral T just the high bit set
+//
+template <typename T>
+constexpr T high_bit = ((T)1) << (bitsize<T>-1);
 
 // high_bits - constant integral T with the N high bits set (N>0)
 //
 template <typename T, unsigned N>
-constexpr T high_bits = ~low_bits<T, bitsize<T>-N>; 
-
+constexpr T high_bits = typename std::make_signed<T>::type(high_bit<T>) >> (N-1); 
 
 // signed_shr - perform signed right shift, even when T is unsigned
 //
@@ -46,12 +48,11 @@ constexpr T signed_shr(T t, unsigned n) {
     return typename std::make_signed<T>::type(t) >> n;
 }
 
-
-// flush_hibit - flush the value with ones when high bit set
+// flush_hibit - flush the value with the value of the high bit
 //
 template <typename T>
 constexpr T flush_hibit(T t) {
-    return t | signed_shr(t, bitsize<T>-1);
+    return signed_shr(t, bitsize<T>-1);
 }
 
 

@@ -52,6 +52,38 @@ TEST(bitfiddle_test, test_low_bits32) {
     //EXPECT_EQ(low_bits32_32, 0xFFFFFFFF);
 }
 
+TEST(bitfiddle_test, test_low_bits64) {
+    const uint64_t low_bits64_0 = low_bits<std::uint64_t,0>;
+    const uint64_t low_bits64_1 = low_bits<std::uint64_t,1>;
+    const uint64_t low_bits64_2 = low_bits<std::uint64_t,2>;
+    const uint64_t low_bits64_3 = low_bits<std::uint64_t,3>;
+    const uint64_t low_bits64_4 = low_bits<std::uint64_t,4>;
+    const uint64_t low_bits64_61 = low_bits<std::uint64_t,61>;
+    const uint64_t low_bits64_62 = low_bits<std::uint64_t,62>;
+    const uint64_t low_bits64_63 = low_bits<std::uint64_t,63>;
+    // doesn't compile: const uint64_t low_bits64_64 = low_bits<std::uint64_t,64>;
+
+    EXPECT_EQ(low_bits64_0, 0x0000000000000000L);
+    EXPECT_EQ(low_bits64_1, 0x0000000000000001L);
+    EXPECT_EQ(low_bits64_2, 0x0000000000000003L);
+    EXPECT_EQ(low_bits64_3, 0x0000000000000007L);
+    EXPECT_EQ(low_bits64_4, 0x000000000000000FL);
+    EXPECT_EQ(low_bits64_61, 0x1FFFFFFFFFFFFFFFL);
+    EXPECT_EQ(low_bits64_62, 0x3FFFFFFFFFFFFFFFL);
+    EXPECT_EQ(low_bits64_63, 0x7FFFFFFFFFFFFFFFL);
+    //EXPECT_EQ(low_bits64_64, 0xFFFFFFFFFFFFFFFFL);
+}
+
+TEST(bitfiddle_test, test_high_bit32) {
+    const uint32_t high_bit32 = high_bit<std::uint32_t>;
+    EXPECT_EQ(high_bit32, 0x80000000);
+}
+
+TEST(bitfiddle_test, test_high_bit64) {
+    const uint64_t high_bit64 = high_bit<std::uint64_t>;
+    EXPECT_EQ(high_bit64, 0x8000000000000000);
+}
+
 TEST(bitfiddle_test, test_high_bits32) {
 
     // doesn't compile: const uint32_t high_bits32_0 = high_bits<std::uint32_t,0>;
@@ -75,28 +107,6 @@ TEST(bitfiddle_test, test_high_bits32) {
     EXPECT_EQ(high_bits32_30, 0xFFFFFFFC);
     EXPECT_EQ(high_bits32_31, 0xFFFFFFFE);
     EXPECT_EQ(high_bits32_32, 0xFFFFFFFF);
-}
-
-TEST(bitfiddle_test, test_low_bits64) {
-    const uint64_t low_bits64_0 = low_bits<std::uint64_t,0>;
-    const uint64_t low_bits64_1 = low_bits<std::uint64_t,1>;
-    const uint64_t low_bits64_2 = low_bits<std::uint64_t,2>;
-    const uint64_t low_bits64_3 = low_bits<std::uint64_t,3>;
-    const uint64_t low_bits64_4 = low_bits<std::uint64_t,4>;
-    const uint64_t low_bits64_61 = low_bits<std::uint64_t,61>;
-    const uint64_t low_bits64_62 = low_bits<std::uint64_t,62>;
-    const uint64_t low_bits64_63 = low_bits<std::uint64_t,63>;
-    // doesn't compile: const uint64_t low_bits64_64 = low_bits<std::uint64_t,64>;
-
-    EXPECT_EQ(low_bits64_0, 0x0000000000000000L);
-    EXPECT_EQ(low_bits64_1, 0x0000000000000001L);
-    EXPECT_EQ(low_bits64_2, 0x0000000000000003L);
-    EXPECT_EQ(low_bits64_3, 0x0000000000000007L);
-    EXPECT_EQ(low_bits64_4, 0x000000000000000FL);
-    EXPECT_EQ(low_bits64_61, 0x1FFFFFFFFFFFFFFFL);
-    EXPECT_EQ(low_bits64_62, 0x3FFFFFFFFFFFFFFFL);
-    EXPECT_EQ(low_bits64_63, 0x7FFFFFFFFFFFFFFFL);
-    //EXPECT_EQ(low_bits64_64, 0xFFFFFFFFFFFFFFFFL);
 }
 
 TEST(bitfiddle_test, test_high_bits64) {
@@ -135,9 +145,9 @@ TEST(bitfiddle_test, test_signed_shr) {
 
 TEST(bitfiddle_test, test_flush_hibit) {
     EXPECT_EQ(flush_hibit(0), 0);
-    EXPECT_EQ(flush_hibit(0xF0), 0xF0);
+    EXPECT_EQ(flush_hibit(0xF0), 0);
     EXPECT_EQ(flush_hibit(0x80000000), 0xFFFFFFFF);
-    EXPECT_EQ(flush_hibit(0xF0000000L), 0xF0000000L);
+    EXPECT_EQ(flush_hibit(0xF0000000L), 0L);
     EXPECT_EQ(flush_hibit(0xA000000000000000L), 0xFFFFFFFFFFFFFFFFL);
 }
 

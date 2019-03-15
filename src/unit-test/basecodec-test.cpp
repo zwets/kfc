@@ -30,6 +30,8 @@ static std::uint32_t (*encode_base32)(unsigned char) = encode_base<std::uint32_t
 static std::uint64_t (*encode_base64)(unsigned char) = encode_base<std::uint64_t,INVAL>;
 static char (*decode_base32)(std::uint32_t) = decode_base<std::uint32_t>;
 static char (*decode_base64)(std::uint64_t) = decode_base<std::uint64_t>;
+static char (*decode_comp32)(std::uint32_t) = decode_comp_base<std::uint32_t>;
+static char (*decode_comp64)(std::uint64_t) = decode_comp_base<std::uint64_t>;
 
 // decode_base --------------------------------------------------------
 
@@ -148,6 +150,68 @@ TEST(basecodec_test, test_decode_neg_g) {
 TEST(basecodec_test, test_decode_neg_t) {
     EXPECT_EQ(decode_base32(HIBIT_32|T_VAL), 't');
     EXPECT_EQ(decode_base64(HIBIT_64|T_VAL), 't');
+}
+
+// decode_comp_base --------------------------------------------------------
+
+TEST(basecodec_test, test_decode_comp_a) {
+    EXPECT_EQ(decode_comp32(A_VAL), 't');
+    EXPECT_EQ(decode_comp64(A_VAL), 't');
+}
+
+TEST(basecodec_test, test_decode_comp_c) {
+    EXPECT_EQ(decode_comp32(C_VAL), 'g');
+    EXPECT_EQ(decode_comp64(C_VAL), 'g');
+}
+
+TEST(basecodec_test, test_decode_comp_g) {
+    EXPECT_EQ(decode_comp32(G_VAL), 'c');
+    EXPECT_EQ(decode_comp64(G_VAL), 'c');
+}
+
+TEST(basecodec_test, test_decode_comp_t) {
+    EXPECT_EQ(decode_comp32(T_VAL), 'a');
+    EXPECT_EQ(decode_comp64(T_VAL), 'a');
+}
+
+TEST(basecodec_test, test_decode_comp_oob_a) {
+    EXPECT_EQ(decode_comp32(4 + A_VAL), 't');
+    EXPECT_EQ(decode_comp64(4 + A_VAL), 't');
+}
+
+TEST(basecodec_test, test_decode_comp_oob_c) {
+    EXPECT_EQ(decode_comp32(4 + C_VAL), 'g');
+    EXPECT_EQ(decode_comp64(4 + C_VAL), 'g');
+}
+
+TEST(basecodec_test, test_decode_comp_oob_g) {
+    EXPECT_EQ(decode_comp32(4 + G_VAL), 'c');
+    EXPECT_EQ(decode_comp64(4 + G_VAL), 'c');
+}
+
+TEST(basecodec_test, test_decode_comp_oob_t) {
+    EXPECT_EQ(decode_comp32(4 + T_VAL), 'a');
+    EXPECT_EQ(decode_comp64(4 + T_VAL), 'a');
+}
+
+TEST(basecodec_test, test_decode_comp_neg_a) {
+    EXPECT_EQ(decode_comp32(HIBIT_32|A_VAL), 't');
+    EXPECT_EQ(decode_comp64(HIBIT_64|A_VAL), 't');
+}
+
+TEST(basecodec_test, test_decode_comp_neg_c) {
+    EXPECT_EQ(decode_comp32(HIBIT_32|C_VAL), 'g');
+    EXPECT_EQ(decode_comp64(HIBIT_64|C_VAL), 'g');
+}
+
+TEST(basecodec_test, test_decode_comp_neg_g) {
+    EXPECT_EQ(decode_comp32(HIBIT_32|G_VAL), 'c');
+    EXPECT_EQ(decode_comp64(HIBIT_64|G_VAL), 'c');
+}
+
+TEST(basecodec_test, test_decode_comp_neg_t) {
+    EXPECT_EQ(decode_comp32(HIBIT_32|T_VAL), 'a');
+    EXPECT_EQ(decode_comp64(HIBIT_64|T_VAL), 'a');
 }
 
 

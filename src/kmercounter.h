@@ -23,7 +23,7 @@
 #include <memory>
 #include <algorithm>
 #include "tallyman.h"
-#include "kmercodec.h"
+#include "kmerencoder.h"
 
 namespace kfc {
 
@@ -97,7 +97,7 @@ class kmer_counter
 // kmer_counter_tally ----------------------------------------------------------
 //
 // Implements kmer_counter for a given kmer_t.  You can instantiate this class
-// directly if you know your ksize ahead of time that ksize will not exceed kmer_codec<kmer_t>::max_ksize.
+// directly if you know your ksize ahead of time that ksize will not exceed kmer_encoder<kmer_t>::max_ksize.
 
 template <typename kmer_t, typename count_t>
 class kmer_counter_tally : public kmer_counter
@@ -108,11 +108,11 @@ class kmer_counter_tally : public kmer_counter
             "template argument count_t must be a numerical type");
 
     public:
-        constexpr static int max_ksize = kmer_codec<kmer_t>::max_ksize;
+        constexpr static int max_ksize = kmer_encoder<kmer_t>::max_ksize;
 
     private:
         std::unique_ptr<tallyman<kmer_t,count_t> > tallyman_;
-        kmer_codec<kmer_t> codec_;
+        kmer_encoder<kmer_t> encoder_;
 
     public:
 	kmer_counter_tally(int ksize, bool s_strand, unsigned mem_gb, unsigned n_threads);
@@ -143,11 +143,11 @@ class kmer_counter_list : public kmer_counter
             "template argument kmer_t must be unsigned integral");
 
     public:
-        constexpr static int max_ksize = kmer_codec<kmer_t>::max_ksize;
+        constexpr static int max_ksize = kmer_encoder<kmer_t>::max_ksize;
 
     private:
         kmer_t *kmers_, *pkmers_cur_, *pkmers_end_;
-        kmer_codec<kmer_t> codec_;
+        kmer_encoder<kmer_t> encoder_;
 
     public:
 	kmer_counter_list(int ksize, bool s_strand, unsigned min_mcap, unsigned max_gb, unsigned n_threads);
@@ -212,7 +212,7 @@ template <typename kmer_t,typename count_t>
 kmer_counter_tally<kmer_t,count_t>::kmer_counter_tally(int ksize, bool s_strand, unsigned mem_gb, unsigned n_threads)
     : kmer_counter(ksize, s_strand, n_threads),
       tallyman_(tallyman<kmer_t,count_t>::create(2*ksize-(s_strand?0:1), mem_gb)),
-      codec_(ksize, s_strand)
+      encoder_(ksize, s_strand)
 {
     if (ksize > max_ksize)
         raise_error("k-mer size %d too large for this impl (max %d)", ksize, max_ksize);
@@ -222,7 +222,7 @@ template <typename kmer_t,typename count_t>
 void
 kmer_counter_tally<kmer_t,count_t>::process(const std::string& data)
 {
-    std::vector<kmer_t> kmers = codec_.encode(data);
+    std::vector<kmer_t> kmers = encoder_.encode(data);
     tallyman_->tally(kmers);
 }
 
@@ -230,7 +230,7 @@ template <typename kmer_t,typename count_t>
 void
 kmer_counter_tally<kmer_t,count_t>::process(std::string &&data)
 {
-    std::vector<kmer_t> kmers = codec_.encode(data);
+    std::vector<kmer_t> kmers = encoder_.encode(data);
     tallyman_->tally(kmers);
 }
 
@@ -276,7 +276,7 @@ kmer_counter_tally<kmer_t, count_t>::write_results(std::ostream &os, unsigned op
     if (do_invalid && (n_invalid || do_zeros)) {
         if (do_dna)
             os << "invalid\t";
-        os << codec_.max_kmer() + 1 << '\t' << n_invalid << std::endl;
+        os << encoder_.max_kmer() + 1 << '\t' << n_invalid << std::endl;
     }
 
     if (n_invalid)
@@ -294,7 +294,7 @@ kmer_counter_tally<kmer_t, count_t>::write_vec_results(std::ostream &os, const c
     while (++p != pend) {
         if (*p || zeros) {
             if (dna)
-                os << codec_.decode(kmer) << '\t';
+                os << encoder_.decode(kmer) << '\t';
             os << kmer << '\t' << *p << std::endl;
         }
         ++kmer;
@@ -313,7 +313,7 @@ kmer_counter_tally<kmer_t, count_t>::write_map_results(std::ostream &os, bool dn
     if (!zeros) {
         while (p != pend) {
             if (dna)
-                os << codec_.decode(p->first) << '\t';
+                os << encoder_.decode(p->first) << '\t';
             os << p->first << '\t' << p->second << std::endl;
             ++p;
         }
@@ -327,14 +327,14 @@ kmer_counter_tally<kmer_t, count_t>::write_map_results(std::ostream &os, bool dn
 
             while (kmer != next_kmer) {
                 if (dna)
-                    os << codec_.decode(kmer) << '\t';
+                    os << encoder_.decode(kmer) << '\t';
                 os << kmer << "\t0" << std::endl;
                 ++kmer;
             }
 
             if (kmer != done_kmer) { // so it is next_kmer and p->first
                 if (dna)
-                    os << codec_.decode(kmer) << '\t';
+                    os << encoder_.decode(kmer) << '\t';
                 os << kmer << '\t' << p->second << std::endl;
                 next_kmer = ++p == pend ? done_kmer : p->first;
                 ++kmer;
@@ -350,7 +350,7 @@ template <typename kmer_t>
 kmer_counter_list<kmer_t>::kmer_counter_list(int ksize, bool s_strand, unsigned min_mcap, unsigned max_gb, unsigned n_threads)
     : kmer_counter(ksize, s_strand, n_threads),
       kmers_(0), pkmers_cur_(0), pkmers_end_(0),
-      codec_(ksize, s_strand)
+      encoder_(ksize, s_strand)
 {
     if (ksize > max_ksize)
         raise_error("k-mer size %d too large for this impl (max %d)", ksize, max_ksize);
@@ -400,7 +400,7 @@ kmer_counter_list<kmer_t>::process(const std::string& data)
         // first bump the pcur, so later next thread can enter before encode
         kmer_t *encode_ptr = pkmers_cur_;
         pkmers_cur_ = new_pcur;
-        codec_.encode(data, encode_ptr);
+        encoder_.encode(data, encode_ptr);
     }
     else
         raise_error("k-mer list capacity (%uM k-mers) exhausted",
@@ -457,13 +457,13 @@ kmer_counter_list<kmer_t>::write_results(std::ostream &os, unsigned opts) const
 
         std::sort(kmers_, pkmers_cur_);
 
-        if (*p == codec_.invalid_kmer) {
+        if (encoder_.is_invalid(*p)) {
             // we hit invalid right away, but since we're sorted
             // this means we are done (invalid is beyond max)
             n_invalid = pkmers_cur_ - p;
             if (do_zeros)
-                for (kmer_t i = 0; i <= codec_.max_kmer(); ++i) {
-                    if (do_dna) os << codec_.decode(i) << '\t';
+                for (kmer_t i = 0; i <= encoder_.max_kmer(); ++i) {
+                    if (do_dna) os << encoder_.decode(i) << '\t';
                     os << i << '\t' << 0 << std::endl;
                 }
         }
@@ -475,7 +475,7 @@ kmer_counter_list<kmer_t>::write_results(std::ostream &os, unsigned opts) const
             // optionally generate zeros for kmers 0..last-1
             if (do_zeros)
                 for (kmer_t i = 0; i < last; ++i) {
-                    if (do_dna) os << codec_.decode(i) << '\t';
+                    if (do_dna) os << encoder_.decode(i) << '\t';
                     os << i << '\t' << 0 << std::endl;
                 }
 
@@ -483,17 +483,17 @@ kmer_counter_list<kmer_t>::write_results(std::ostream &os, unsigned opts) const
                 if (*p == last) {   // continue run of last value
                     ++count;
                 }
-                else if (*p == codec_.invalid_kmer) {
+                else if (encoder_.is_invalid(*p)) {
                     n_invalid += pkmers_cur_ - p;
                     break;
                 }
                 else {
-                    if (do_dna) os << codec_.decode(last) << '\t';
+                    if (do_dna) os << encoder_.decode(last) << '\t';
                     os << last << '\t' << count << std::endl;
 
                     if (do_zeros)
                         while (++last != *p) {
-                            if (do_dna) os << codec_.decode(last) << '\t';
+                            if (do_dna) os << encoder_.decode(last) << '\t';
                             os << last << '\t' << 0 << std::endl;
                         }
 
@@ -502,26 +502,26 @@ kmer_counter_list<kmer_t>::write_results(std::ostream &os, unsigned opts) const
                 }
             }
 
-            if (do_dna) os << codec_.decode(last) << '\t';
+            if (do_dna) os << encoder_.decode(last) << '\t';
             os << last << '\t' << count << std::endl;
 
             if (do_zeros)
-                while (++last <= codec_.max_kmer()) {
-                    if (do_dna) os << codec_.decode(last) << '\t';
+                while (++last <= encoder_.max_kmer()) {
+                    if (do_dna) os << encoder_.decode(last) << '\t';
                     os << last << '\t' << 0 << std::endl;
                 }
         }
     }
     else if (do_zeros) {
-        for (kmer_t i = 0; i <= codec_.max_kmer(); ++i) {
-            if (do_dna) os << codec_.decode(i) << '\t';
+        for (kmer_t i = 0; i <= encoder_.max_kmer(); ++i) {
+            if (do_dna) os << encoder_.decode(i) << '\t';
             os << i << '\t' << 0 << std::endl;
         }
     }
 
     if (do_invalid && (n_invalid || do_zeros)) {
         if (do_dna) os << "invalid\t";
-        os << codec_.max_kmer() + 1 << '\t' << n_invalid << std::endl;
+        os << encoder_.max_kmer() + 1 << '\t' << n_invalid << std::endl;
     }
 
     if (n_invalid) {

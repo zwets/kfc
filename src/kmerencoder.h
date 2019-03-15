@@ -1,4 +1,4 @@
-/* kmercodec.h
+/* kmerencoder.h
  * 
  * Copyright (C) 2019  Marco van Zwetselaar <io@zwets.it>
  *
@@ -15,8 +15,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef kmercodec_h_INCLUDED
-#define kmercodec_h_INCLUDED
+#ifndef kmerencoder_h_INCLUDED
+#define kmerencoder_h_INCLUDED
 
 #include <string>
 #include <vector>
@@ -25,45 +25,46 @@
 namespace kfc {
 
 
-// kmer_codec - encodes and decodes between DNA and k-mers
+// kmer_encoder - encodes and decodes between DNA and k-mers
 //
-// A kmer_codec is constructed for a fixed kmer size and encoding method.
+// A kmer_encoder is constructed for a fixed kmer size and encoding method.
 // The encoding method is canonical (default) or single stranded; see the
 // README.md for explanation.
 //
 // Template parameter kmer_t must be an unsigned integral type that can hold
 // encoded k-mers of the given ksize, plus one reserved bit so that invalid
-// k-mers can be reported.  Constant member kmer_codec<kmer_t>::max_ksize
+// k-mers can be reported.  Constant member kmer_encoder<kmer_t>::max_ksize
 // gives the maximum ksize.  The constructor will throw an exception if ksize
 // is larger.
 //
-// The encode(string) member encodes a string of DNA to a vector of kmer
-// values.  Any kmer in string that contains an invalid base (not acgtACGT)
-// is reported as value kmer_codec<kmer_t>::invalid_kmer.
+// The encode() members encode a string of DNA to a vector of kmer values.
+// Any kmer in string that contains an invalid base (not acgtACGT) is reported
+// as an arbitrary number with its high bit set.
 //
 // The decode(kmer_t) member decodes a kmer to a string of DNA.  It decodes
-// the invalid_kmer to the string "invalid".
+// invalid kmers to the string "invalid".
 //
 template <typename kmer_t>
-class kmer_codec {
+class kmer_encoder {
     static_assert(std::is_unsigned<kmer_t>::value,
             "template argument kmer_t must be unsigned integral");
 
     public:
-        constexpr static kmer_t invalid_kmer = static_cast<kmer_t>(-1);
         constexpr static int max_ksize = 4*sizeof(kmer_t) - 1;
 
+        constexpr static bool is_invalid(kmer_t kmer) { return kmer & high_bit; }
+
     private:
-        int ksize_;
-        bool sstrand_;
-        kmer_t max_kmer_;
+        const int ksize_;
+        const bool sstrand_;
+        const kmer_t max_kmer_;
+        const kmer_t invalid_mask_;
 
     public:
-        explicit kmer_codec(int ksize, bool sstrand = false);
+        explicit kmer_encoder(int ksize, bool sstrand = false);
 
         kmer_t max_kmer() const { return max_kmer_; }
 
-        inline kmer_t encode_base(char) const;
         kmer_t encode_kmer(std::string::const_iterator) const;
 
         void encode(const std::string&, kmer_t*) const;
@@ -75,18 +76,27 @@ class kmer_codec {
         std::string decode(kmer_t, bool rc = false) const;
 
     private:
-        void rolling_encode(std::vector<kmer_t>&, std::string::const_iterator, std::string::const_iterator) const;
-        kmer_t chomp_invalids(std::vector<kmer_t>&, std::string::const_iterator&, std::string::const_iterator) const;
+        constexpr static kmer_t high_bit = ((kmer_t)1) << (8*sizeof(kmer_t)-1);
+        constexpr static kmer_t all_ones = ~((kmer_t)0);
+        constexpr static kmer_t low_bits(int n) { return ((((kmer_t)1)<<n)-1); }
+        constexpr static kmer_t high_bits(int n) { return ((((kmer_t)1)<<n)-1) << (8*sizeof(kmer_t)-n); }
+
+    private:
+        void rolling_encode(std::string::const_iterator, std::string::const_iterator, kmer_t*) const;
+        kmer_t chomp_invalids(std::string::const_iterator&, std::string::const_iterator, kmer_t*) const;
 };
 
 
 // implementation ------------------------------------------------------------
 
 template <typename kmer_t>
-kmer_codec<kmer_t>::kmer_codec(int ksize, bool sstrand)
-    : ksize_(ksize), sstrand_(sstrand), max_kmer_(0)
+kmer_encoder<kmer_t>::kmer_encoder(int ksize, bool sstrand)
+    : ksize_(ksize), sstrand_(sstrand), 
+      max_kmer_(low_bits(2*ksize-(sstrand?0:1))),
+      invalid_mask_(high_bits(2*ksize))
 {
-    //std::cerr << "kmer_codec<" << (sizeof(kmer_t)*8) << ">(" << ksize << "," << sstrand << ")" << std::endl;
+    //std::cerr << "kmer_encoder<" << (sizeof(kmer_t)*8) << ">(" << ksize << "," << sstrand << ")" << std::endl;
+    std::cerr << "ksize " << ksize_ << "; max_kmer " << max_kmer_ << "; invalid_mask " << invalid_mask_ << std::endl;
 
     if (ksize < 1)
         raise_error("invalid k-mer size: %d", ksize);
@@ -97,97 +107,35 @@ kmer_codec<kmer_t>::kmer_codec(int ksize, bool sstrand)
     if (!sstrand && (ksize & 0x1) != 0x1)
         raise_error("k-mer size must be odd for canonical encoding");
 
-    max_kmer_ = (static_cast<kmer_t>(1) << (2*ksize-(sstrand?0:1))) - 1;
-}
-
-template <typename kmer_t>
-inline kmer_t
-kmer_codec<kmer_t>::encode_base(char c) const
-{
-    constexpr static kmer_t X = kmer_codec<kmer_t>::invalid_kmer;
-    constexpr static kmer_t base_values[] = { 0, X, 1, X, X, X, 2, X, X, X, X, X, X, X, X, X, X, X, X, 3 };
-
-    unsigned o = c - 'A';
-
-    if (o > 19) {      // outside 'A'..'T'
-        o = c - 'a';            // try 'a'..'t' smallcaps
-        if (o > 19)
-            return X;
-    }
-
-    return base_values[o];
-}
-
-template <typename kmer_t>
-kmer_t
-kmer_codec<kmer_t>::encode_kmer(const std::string::const_iterator pcur) const
-{
-    kmer_t res = 0;
-
-    std::string::const_iterator pend = pcur + ksize_;
-
-    if (sstrand_) {     // single strand: encode every base as two bits
-        std::string::const_iterator p = pcur - 1;
-
-        while (++p != pend)
-            res = (res<<2) | encode_base(*p);
-    }
-    else {              // canonical: middle base as one bit, determines direction
-        std::string::const_iterator pmid = pcur + (ksize_ / 2);
-
-        if (!(encode_base(*pmid) & 2))  {     // middle base is a or c, encode forward
-            std::string::const_iterator p = pcur - 1;
-
-            while (++p != pmid)
-                res = (res<<2) | encode_base(*p);
-
-            res = (res<<1) | encode_base(*p); // central base encoded as 1 bit: a->0, c->1
-
-            while (++p != pend)
-                res = (res<<2) | encode_base(*p);
-        }
-        else {                                // middle base is g or t, encode reverse
-            std::string::const_iterator p = pend;
-
-            while (--p != pmid)
-                res = (res<<2) | (encode_base(*p) ^ 3); // xor with 3 is complementary base
-
-            res = (res<<1) | (encode_base(*p) ^ 3); // t->a->0, g->c->1
-
-            while (p-- != pcur)
-                res = (res<<2) | (encode_base(*p) ^ 3);
-        }
-    }
-
-    // If any base was invalid, then the bitwise or of its all-ones representation
-    // will have set the high bit in res, and we know we must return invalid_kmer.
-
-    return res > max_kmer_ ? invalid_kmer : res;
 }
 
 template <typename kmer_t>
 void
-kmer_codec<kmer_t>::encode(const std::string& s, kmer_t* t) const
+kmer_encoder<kmer_t>::encode(const std::string& s, kmer_t* t) const
 {
     std::string::const_iterator pcur = s.cbegin();
-    std::string::const_iterator pend = pcur + s.size() + 1 - ksize_;
+    std::string::const_iterator pend = s.cend();
 
-    while (pcur < pend)
-        *t++ = encode_kmer(pcur++);
+    if (sstrand_)
+        encode_kmers_ss<kmer_t>(s.cbegin(), s.cend(), t);
+    else
+        encode_kmers_ds(s.cbegin(), s.cend(), t);
+
+    if (sstrand_)
+        rolling_encode(pcur, pend, t);
+    else
+        while (pcur < pend)
+            *t++ = encode_kmer(pcur++);
 }
 
 template <typename kmer_t>
 void
-kmer_codec<kmer_t>::encode(std::string &&s, kmer_t* t) const
+kmer_encoder<kmer_t>::encode(std::string &&s, kmer_t* t) const
 {
     return encode((const std::string&)s, t);
 }
-
-template <typename kmer_t>
-kmer_t
-kmer_codec<kmer_t>::chomp_invalids(std::vector<kmer_t>& result, std::string::const_iterator &p, std::string::const_iterator pend) const
-{
-    kmer_t kmer = invalid_kmer;
+/*
+    kmer_t kmer = all_ones;
 
     while (kmer == invalid_kmer && p != pend) {
 
@@ -196,7 +144,7 @@ kmer_codec<kmer_t>::chomp_invalids(std::vector<kmer_t>& result, std::string::con
         while (encode_base(*--pchk) != invalid_kmer)
             if (pchk == p) {        // we made it without invalids, so p is good
                 kmer = encode_kmer(p++);  // encode it, add it, and move p forward
-                result.push_back(kmer);
+                *t++ = kmer;
                 break;              // so end with p at next starting point
             }
 
@@ -204,36 +152,43 @@ kmer_codec<kmer_t>::chomp_invalids(std::vector<kmer_t>& result, std::string::con
             if (pchk >= pend)
                 pchk = pend - 1;    // the last possible invalid is one before pend
             do {                    // add an invalid for p upto and including pchk
-                result.push_back(kmer);
+                *t++ = kmer;
             } while (p++ != pchk);  // and end with p++ just beyond pchk
         }
     }
-
-    return kmer;
-}
-
+*/
 template <typename kmer_t>
 void
-kmer_codec<kmer_t>::rolling_encode(std::vector<kmer_t>& result, std::string::const_iterator pbegin, std::string::const_iterator pend) const
+kmer_encoder<kmer_t>::rolling_encode(std::string::const_iterator pbegin, std::string::const_iterator pend, kmer_t *t) const
     // Note: - pend is one past the last kmer starting position, not one past the end of string (which is kmer chars further)
     //       - in other words, we must encode exactly one kmer for each of [pbegin,pend)
     //       - this method is private, we may assume that it is called with pbegin < pend
 {
     std::string::const_iterator p = pbegin;
-    kmer_t kmer = chomp_invalids(result, p /*ref*/, pend);
+    std::string::const_iterator pk = pbegin + ksize_;
+   
+    kmer_t kmer = 0;
+
+    do { // fill the first
+        kmer <<= 2;
+        kmer |= encode_base(*p);
+    } while (++p != pk);
+
+    *t++ = kmer;    // but blank out when high bit set!
+    //kmer | (signed)kmer>>all but one;
 
     while (p != pend) {
         
         kmer_t new_base = encode_base(p[ksize_-1]);
 
-        if (new_base == invalid_kmer) {
-            kmer = chomp_invalids(result, p, pend);
+        if (is_invalid(new_base)) {
+            kmer = -1 ; //chomp_invalids(p, pend, t);
         }
         else { // new base is good
             kmer <<= 2;        
             kmer |= new_base;
             kmer &= max_kmer_;
-            result.push_back(kmer);
+            *t++ = kmer;
             ++p;
         }
     }
@@ -241,7 +196,7 @@ kmer_codec<kmer_t>::rolling_encode(std::vector<kmer_t>& result, std::string::con
 
 template <typename kmer_t>
 std::vector<kmer_t>
-kmer_codec<kmer_t>::encode(const std::string& s) const
+kmer_encoder<kmer_t>::encode(const std::string& s) const
 {
     std::vector<kmer_t> result;
 
@@ -257,11 +212,8 @@ kmer_codec<kmer_t>::encode(const std::string& s) const
         std::string::const_iterator pcur = s.cbegin(); // first
         std::string::const_iterator pend = pcur + n;   // one past
 
-        if (sstrand_)
-            rolling_encode(result, pcur, pend);
-        else
-            while (pcur != pend)
-                result.push_back(encode_kmer(pcur++));
+        while (pcur != pend)
+            result.push_back(encode_kmer(pcur++));
     }
 
     return result;
@@ -269,14 +221,14 @@ kmer_codec<kmer_t>::encode(const std::string& s) const
 
 template <typename kmer_t>
 std::vector<kmer_t>
-kmer_codec<kmer_t>::encode(std::string &&s) const
+kmer_encoder<kmer_t>::encode(std::string &&s) const
 {
     return encode(s);
 }
 
 template <typename kmer_t>
 std::string
-kmer_codec<kmer_t>::decode(kmer_t kmer, bool rc) const
+kmer_encoder<kmer_t>::decode(kmer_t kmer, bool rc) const
 {
     static const char CHARS[4] =  { 'a', 'c', 'g', 't' };
     static const char RCHARS[4] = { 't', 'g', 'c', 'a' };
@@ -352,5 +304,5 @@ kmer_codec<kmer_t>::decode(kmer_t kmer, bool rc) const
 
 } // namespace kfc
 
-#endif // kmercodec_h_INCLUDED
+#endif // kmerencoder_h_INCLUDED
        // vim: sts=4:sw=4:ai:si:et

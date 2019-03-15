@@ -48,10 +48,10 @@ constexpr T signed_shr(T t, unsigned n) {
     return typename std::make_signed<T>::type(t) >> n;
 }
 
-// flush_hibit - flush the value with the value of the high bit
+// flood_hibit - return value with all bits set to its high bit
 //
 template <typename T>
-constexpr T flush_hibit(T t) {
+constexpr T flood_hibit(T t) {
     return signed_shr(t, bitsize<T>-1);
 }
 

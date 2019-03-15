@@ -143,12 +143,12 @@ TEST(bitfiddle_test, test_signed_shr) {
     EXPECT_EQ(signed_shr(0x4000000000000000L, 1), 0x2000000000000000L);
 }
 
-TEST(bitfiddle_test, test_flush_hibit) {
-    EXPECT_EQ(flush_hibit(0), 0);
-    EXPECT_EQ(flush_hibit(0xF0), 0);
-    EXPECT_EQ(flush_hibit(0x80000000), 0xFFFFFFFF);
-    EXPECT_EQ(flush_hibit(0xF0000000L), 0L);
-    EXPECT_EQ(flush_hibit(0xA000000000000000L), 0xFFFFFFFFFFFFFFFFL);
+TEST(bitfiddle_test, test_flood_hibit) {
+    EXPECT_EQ(flood_hibit(0), 0);
+    EXPECT_EQ(flood_hibit(0xF0), 0);
+    EXPECT_EQ(flood_hibit(0x80000000), 0xFFFFFFFF);
+    EXPECT_EQ(flood_hibit(0xF0000000L), 0L);
+    EXPECT_EQ(flood_hibit(0xA000000000000000L), 0xFFFFFFFFFFFFFFFFL);
 }
 
 

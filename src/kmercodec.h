@@ -31,7 +31,8 @@ namespace kfc {
 //   when there was an invalid base in the kmer
 //
 template <typename kmer_t, unsigned ksize>
-kmer_t ss_encode_one(const char *p)
+kmer_t
+ss_encode_one(const char *p)
 {
     static_assert(std::is_unsigned<kmer_t>::value,
             "template argument kmer_t must be unsigned integral");
@@ -60,7 +61,8 @@ kmer_t ss_encode_one(const char *p)
 //   encoded valid kmers, or values with high bit set to mark invalid
 //
 template <typename kmer_t, unsigned ksize>
-void ss_encode(const char *p0, const char *p1, kmer_t *t)
+void
+ss_encode(const char *p0, const char *p1, kmer_t *t)
 {
     static_assert(std::is_unsigned<kmer_t>::value,
             "template argument kmer_t must be unsigned integral");
@@ -80,7 +82,7 @@ void ss_encode(const char *p0, const char *p1, kmer_t *t)
         // make place for the new base
         kmer <<= 2;
         // clear all when the new base has high bit set (invalid)
-        kmer &= ~flush_hibit(new_base);
+        kmer &= ~flood_hibit<kmer_t>(new_base);
         // or in the new base or set high bits for next ksize kmers
         kmer |= new_base;
     }
@@ -90,13 +92,16 @@ void ss_encode(const char *p0, const char *p1, kmer_t *t)
     // p now points at the next base to roll into the kmer
 
     while (p != p1) {
-        kmer_t new_base = encode_base<kmer_t,invalid_value>(*p++);
         // make place for the new base
         kmer <<= 2;
-        // clear all when high bit is set (invalid kmer)
-        kmer &= ~flush_hibit(new_base);
-        // or in the new base or raise high bits for next ksize kmers
+        // retrieve the new base
+        kmer_t new_base = encode_base<kmer_t,invalid_value>(*p++);
+        // clear all when new base has high bit set (invalid kmer)
+        kmer &= ~flood_hibit<kmer_t>(new_base);
+        // or in the new base or invalid value with ksize high bits
         kmer |= new_base;
+        // clear bits above the leftmost base if current kmer is good
+        kmer &= signed_shr<kmer_t>(kmer|~high_bit<kmer_t>, bitsize<kmer_t>-2*ksize-1);
         // write it
         *t++ = kmer;
     }
@@ -109,22 +114,29 @@ void ss_encode(const char *p0, const char *p1, kmer_t *t)
 //   or an arbitrary number with high bit set if the input had it too
 //
 template <typename kmer_t, unsigned ksize>
-kmer_t ss_revcomp(kmer_t in)
+kmer_t
+ss_revcomp(kmer_t in)
 {
+    static_assert(std::is_unsigned<kmer_t>::value,
+            "template argument kmer_t must be unsigned integral");
+    static_assert(0 < ksize && ksize < 4*sizeof(kmer_t),
+            "template argument ksize must be in range [1,bitsize/2)");
+    static_assert(ksize & 1,
+            "template argument ksize must be odd for double strand encoding");
+
     kmer_t out = 0;
 
-    // complement
     in ^= low_bits<kmer_t,2*ksize>;
 
     // reverse by shifting bitpairs from in to out
-    for (int i = 0; i < ksize; ++i) {
+    for (unsigned i = 0; i < ksize; ++i) {
         out <<= 2;
         out |= (in & 0x3);
-        in >>= 2;
+        in = signed_shr(in, 2);  // need to retain the high bit
     }
 
     // return result but set its error bit if it was set on in 
-    return out | high_bit<kmer_t>(in);
+    return out | (in & high_bit<kmer_t>);
 }
 
 
@@ -134,6 +146,11 @@ template <typename kmer_t, unsigned ksize>
 std::string
 ss_decode(kmer_t kmer, bool rc = false)
 {
+    static_assert(std::is_unsigned<kmer_t>::value,
+            "template argument kmer_t must be unsigned integral");
+    static_assert(0 < ksize && ksize < 4*sizeof(kmer_t),
+            "template argument ksize must be in range [1,bitsize-2]");
+
     std::string result;
     result.resize(ksize, 'X');
 
@@ -158,16 +175,17 @@ ss_decode(kmer_t kmer, bool rc = false)
 //            reverse complementing if needed
 //
 template <typename kmer_t, unsigned ksize>
-void ss_to_ds(kmer_t kmer)
+kmer_t
+ss_to_ds(kmer_t kmer)
 {
     static_assert(ksize & 1,
             "template argument ksize must be odd to convert ss to ds");
 
     constexpr kmer_t half_mask = low_bits<kmer_t,ksize>;
 
-    kmer_t out = ((kmer>>3) & 0x1) ? ss_revcomp(kmer) : kmer;
+    kmer_t out = ((kmer>>ksize) & 0x1) ? ss_revcomp<kmer_t,ksize>(kmer) : kmer;
 
-    return ((out & (half_mask << ksize)) >> 1) | (out & half_mask);
+    return ((out & (half_mask << ksize)) >> 1) | (out & (high_bit<kmer_t> | half_mask));
 }
 
 // --- ds encode ---------------------------------------------------------
@@ -179,14 +197,13 @@ void ss_to_ds(kmer_t kmer)
 //   when there was an invalid base in the kmer
 //
 template <typename kmer_t, unsigned ksize>
-kmer_t ds_encode_one(const char *p0)
+kmer_t
+ds_encode_one(const char *p0)
 {
     static_assert(std::is_unsigned<kmer_t>::value,
             "template argument kmer_t must be unsigned integral");
-
     static_assert(0 < ksize && ksize < 4*sizeof(kmer_t),
             "template argument ksize must be in range [1,bitsize/2)");
-
     static_assert(ksize & 1,
             "template argument ksize must be odd for double strand encoding");
 
@@ -232,7 +249,7 @@ kmer_t ds_encode_one(const char *p0)
         }
 
         // complement
-        kmer ^= low_bits<kmer_t>(2*ksize-1);
+        kmer ^= low_bits<kmer_t,2*ksize-1>;
     }
 
     return kmer;
@@ -247,7 +264,8 @@ kmer_t ds_encode_one(const char *p0)
 //   encoded valid kmers, or values with high bit set to mark invalid
 //
 template <typename kmer_t, unsigned ksize>
-void ds_encode(const char *p0, const char *p1, kmer_t *t)
+void
+ds_encode(const char *p0, const char *p1, kmer_t *t)
 {
     static_assert(std::is_unsigned<kmer_t>::value,
             "template argument kmer_t must be unsigned integral");
@@ -260,24 +278,23 @@ void ds_encode(const char *p0, const char *p1, kmer_t *t)
 
 #if 1
     // IMPLEMENTATION 1: use ss_encode, then ss_to_ds
-    ss_encode(p0, p1, *t);
+    ss_encode<kmer_t,ksize>(p0, p1, t);
 
-    const kmer_t *t1 = t + (p1 - p0 - ksize + 1);
-    kmer_t *pt = t - 1;
-
-    while (++t != t1)
-        *t = ss_to_ds(*t);
+    for (kmer_t *pt = t; pt != t + (p1 - ksize + 1 - p0); ++pt)
+        *pt = ss_to_ds<kmer_t,ksize>(*pt);
 #elif 0
     // IMPLEMENTATION 2: use encode_kmer_ds in turn
     const char *p = p0;
     while (p != p1 - ksize)
-        *t++ = encode_kmer_ds<kmer_t,ksize>(p++);
+        *t++ = ds_encode_one<kmer_t,ksize>(p++);
 #else
     // IMPLEMENTATION 3: write rolling encode
 #endif
 }
 
 
+// ds_decode ----------------------------------------------------------
+//
 template <typename kmer_t, unsigned ksize>
 std::string
 ds_decode(kmer_t kmer, bool rc = false)

@@ -25,19 +25,21 @@ using namespace kfc;
 namespace {
 
 const unsigned A_VAL = 0, C_VAL = 1, G_VAL = 2, T_VAL = 3;
+const std::uint32_t INV32 = high_bit<std::uint32_t>;
+const std::uint64_t INV64 = high_bit<std::uint64_t>;
+
 
 // ss_encode_one
 // ss_encode
 // ss_revcomp
 // ss_decode
 //
-// ss_to_ds
-//
 // ds_encode_one
 // ds_encode
-// ds_decode
 // 
 
+
+// decoding 32 -------------------------------------------------------------
 
 std::string ds_decode32_1(std::uint32_t k, bool rc=false) { return ds_decode<std::uint32_t,1>(k,rc); }
 std::string ss_decode32_1(std::uint32_t k, bool rc=false) { return ss_decode<std::uint32_t,1>(k,rc); }
@@ -45,117 +47,344 @@ std::string ss_decode32_1(std::uint32_t k, bool rc=false) { return ss_decode<std
 std::string ds_decode32_3(std::uint32_t k, bool rc=false) { return ds_decode<std::uint32_t,3>(k,rc); }
 std::string ss_decode32_3(std::uint32_t k, bool rc=false) { return ss_decode<std::uint32_t,3>(k,rc); }
 
-// decoding -------------------------------------------------------------
+std::string ds_decode32_15(std::uint32_t k, bool rc=false) { return ds_decode<std::uint32_t,15>(k,rc); }
+std::string ss_decode32_15(std::uint32_t k, bool rc=false) { return ss_decode<std::uint32_t,15>(k,rc); }
 
-TEST(kmercodec_test, ksize_dec1_a) {
+TEST(kmercodec_test, dec32_1_a) {
     EXPECT_EQ(ds_decode32_1(A_VAL), "a");
     EXPECT_EQ(ds_decode32_1(A_VAL,true), "t");
 }
 
-TEST(kmercodec_test, ksize_dec1_c) {
+TEST(kmercodec_test, dec32_1_c) {
     EXPECT_EQ(ds_decode32_1(C_VAL), "c");
     EXPECT_EQ(ds_decode32_1(C_VAL,true), "g");
 }
 
-TEST(kmercodec_test, ksize_dec1_g1_is_a) {
+TEST(kmercodec_test, dec32_1_g1_is_a) {
     EXPECT_EQ(ds_decode32_1(G_VAL), "a");
     EXPECT_EQ(ds_decode32_1(G_VAL,true), "t");
 }
 
-TEST(kmercodec_test, ksize_dec1_t1_is_c) {
+TEST(kmercodec_test, dec32_1_t1_is_c) {
     EXPECT_EQ(ds_decode32_1(T_VAL), "c");
     EXPECT_EQ(ds_decode32_1(T_VAL,true), "g");
 }
 
-TEST(kmercodec_test, ksize_dec1_a_ss) {
+TEST(kmercodec_test, dec32_1_a_invalid) {
+    EXPECT_EQ(ds_decode32_1(INV32|A_VAL), "X");
+    EXPECT_EQ(ds_decode32_1(INV32|A_VAL,true), "X");
+}
+
+TEST(kmercodec_test, dec32_1_g1_invalid) {
+    EXPECT_EQ(ds_decode32_1(INV32|G_VAL), "X");
+    EXPECT_EQ(ds_decode32_1(INV32|G_VAL,true), "X");
+}
+
+TEST(kmercodec_test, dec32_1_a_ss) {
     EXPECT_EQ(ss_decode32_1(A_VAL), "a");
     EXPECT_EQ(ss_decode32_1(A_VAL,true), "t");
 }
 
-TEST(kmercodec_test, ksize_dec1_c_ss) {
+TEST(kmercodec_test, dec32_1_c_ss) {
     EXPECT_EQ(ss_decode32_1(C_VAL), "c");
     EXPECT_EQ(ss_decode32_1(C_VAL,true), "g");
 }
 
-TEST(kmercodec_test, ksize_dec1_g_ss) {
+TEST(kmercodec_test, dec32_1_g_ss) {
     EXPECT_EQ(ss_decode32_1(G_VAL), "g");
     EXPECT_EQ(ss_decode32_1(G_VAL,true), "c");
 }
 
-TEST(kmercodec_test, ksize_dec1_t_ss) {
+TEST(kmercodec_test, dec32_1_t_ss) {
     EXPECT_EQ(ss_decode32_1(T_VAL), "t");
     EXPECT_EQ(ss_decode32_1(T_VAL,true), "a");
 }
 
-TEST(kmercodec_test, ksize_dec3_acg) {
+TEST(kmercodec_test, dec32_1_a_ss_invalid) {
+    EXPECT_EQ(ss_decode32_1(INV32|A_VAL), "X");
+    EXPECT_EQ(ss_decode32_1(INV32|A_VAL,true), "X");
+}
+
+TEST(kmercodec_test, dec32_1_t_ss_invalid) {
+    EXPECT_EQ(ss_decode32_1(INV32|T_VAL), "X");
+    EXPECT_EQ(ss_decode32_1(INV32|T_VAL,true), "X");
+}
+
+TEST(kmercodec_test, dec32_3_acg) {
     EXPECT_EQ(ds_decode32_3(A_VAL<<3|C_VAL<<2|G_VAL), "acg");
     EXPECT_EQ(ds_decode32_3(A_VAL<<3|C_VAL<<2|G_VAL,true), "cgt");
 }
 
-TEST(kmercodec_test, ksize_dec3_acg_ss) {
+TEST(kmercodec_test, dec32_3_acg_invalid) {
+    EXPECT_EQ(ds_decode32_3(INV32|A_VAL<<3|C_VAL<<2|G_VAL), "XXX");
+    EXPECT_EQ(ds_decode32_3(INV32|A_VAL<<3|C_VAL<<2|G_VAL,true), "XXX");
+}
+
+TEST(kmercodec_test, dec32_3_acg_ss) {
     EXPECT_EQ(ss_decode32_3(A_VAL<<3|C_VAL<<2|G_VAL), "acg");
     EXPECT_EQ(ss_decode32_3(A_VAL<<3|C_VAL<<2|G_VAL,true), "cgt");
 }
 
-TEST(kmercodec_test, ksize_dec3_cgt_ss) {
+TEST(kmercodec_test, dec32_3_cgt_ss) {
     EXPECT_EQ(ss_decode32_3(C_VAL<<4|G_VAL<<2|T_VAL), "cgt");
     EXPECT_EQ(ss_decode32_3(C_VAL<<4|G_VAL<<2|T_VAL,true), "acg");
 }
 
-// encoding -------------------------------------------------------------
+TEST(kmercodec_test, dec32_3_cgt_ss_invalid) {
+    EXPECT_EQ(ss_decode32_3(INV32|C_VAL<<4|G_VAL<<2|T_VAL), "XXX");
+    EXPECT_EQ(ss_decode32_3(INV32|C_VAL<<4|G_VAL<<2|T_VAL,true), "XXX");
+}
+
+TEST(kmercodec_test, dec32_15_ds) {
+    std::uint32_t kmer = 
+        T_VAL<<27|A_VAL<<25|C_VAL<<23|C_VAL<<21|C_VAL<<19|T_VAL<<17|G_VAL<<15|
+        C_VAL<<14|A_VAL<<12|C_VAL<<10|C_VAL<<8 |C_VAL<<6 |A_VAL<<4 |C_VAL<<2 |G_VAL;
+    EXPECT_EQ(ds_decode32_15(kmer),"taccctgcacccacg");
+    EXPECT_EQ(ds_decode32_15(kmer,true),"cgtgggtgcagggta");
+}
+
+TEST(kmercodec_test, dec32_15_ss) {
+    std::uint32_t kmer = 
+        G_VAL<<28|A_VAL<<26|T_VAL<<24|G_VAL<<22|G_VAL<<20|T_VAL<<18|C_VAL<<16|
+        T_VAL<<14|T_VAL<<12|G_VAL<<10|C_VAL<<8 |C_VAL<<6 |C_VAL<<4 |C_VAL<<2 |G_VAL;
+    EXPECT_EQ(ss_decode32_15(kmer), "gatggtcttgccccg");
+    EXPECT_EQ(ss_decode32_15(kmer,true), "cggggcaagaccatc");
+}
+
+TEST(kmercodec_test, dec32_15_ds_inv) {
+    EXPECT_EQ(ds_decode32_15(INV32), "XXXXXXXXXXXXXXX");
+    EXPECT_EQ(ds_decode32_15(-1), "XXXXXXXXXXXXXXX");
+}
+
+TEST(kmercodec_test, dec32_15_ss_inv) {
+    EXPECT_EQ(ss_decode32_15(-1), "XXXXXXXXXXXXXXX");
+}
+
+TEST(kmercodec_test, dec32_15_ds_invalid) {
+    std::uint32_t kmer = INV32|
+        T_VAL<<27|A_VAL<<25|C_VAL<<23|C_VAL<<21|C_VAL<<19|T_VAL<<17|G_VAL<<15|
+        C_VAL<<14|A_VAL<<12|C_VAL<<10|C_VAL<<8 |C_VAL<<6 |A_VAL<<4 |C_VAL<<2 |G_VAL;
+    EXPECT_EQ(ds_decode32_15(kmer),"XXXXXXXXXXXXXXX");
+    EXPECT_EQ(ds_decode32_15(kmer,true),"XXXXXXXXXXXXXXX");
+}
+
+TEST(kmercodec_test, dec32_15_ss_invalid) {
+    std::uint32_t kmer = INV32|
+        G_VAL<<28|A_VAL<<26|T_VAL<<24|G_VAL<<22|G_VAL<<20|T_VAL<<18|C_VAL<<16|
+        T_VAL<<14|T_VAL<<12|G_VAL<<10|C_VAL<<8 |C_VAL<<6 |C_VAL<<4 |C_VAL<<2 |G_VAL;
+    EXPECT_EQ(ss_decode32_15(kmer), "XXXXXXXXXXXXXXX");
+    EXPECT_EQ(ss_decode32_15(kmer,true), "XXXXXXXXXXXXXXX");
+}
+
+// decoding 64 -------------------------------------------------------------
+
+std::string ds_decode64_1(std::uint64_t k, bool rc=false) { return ds_decode<std::uint64_t,1>(k,rc); }
+std::string ss_decode64_1(std::uint64_t k, bool rc=false) { return ss_decode<std::uint64_t,1>(k,rc); }
+
+std::string ds_decode64_3(std::uint64_t k, bool rc=false) { return ds_decode<std::uint64_t,3>(k,rc); }
+std::string ss_decode64_3(std::uint64_t k, bool rc=false) { return ss_decode<std::uint64_t,3>(k,rc); }
+
+std::string ds_decode64_31(std::uint64_t k, bool rc=false) { return ds_decode<std::uint64_t,31>(k,rc); }
+std::string ss_decode64_31(std::uint64_t k, bool rc=false) { return ss_decode<std::uint64_t,31>(k,rc); }
+
+TEST(kmercodec_test, dec64_1_a) {
+    EXPECT_EQ(ds_decode64_1(A_VAL), "a");
+    EXPECT_EQ(ds_decode64_1(A_VAL,true), "t");
+}
+
+TEST(kmercodec_test, dec64_1_c) {
+    EXPECT_EQ(ds_decode64_1(C_VAL), "c");
+    EXPECT_EQ(ds_decode64_1(C_VAL,true), "g");
+}
+
+TEST(kmercodec_test, dec64_1_g1_is_a) {
+    EXPECT_EQ(ds_decode64_1(G_VAL), "a");
+    EXPECT_EQ(ds_decode64_1(G_VAL,true), "t");
+}
+
+TEST(kmercodec_test, dec64_1_t1_is_c) {
+    EXPECT_EQ(ds_decode64_1(T_VAL), "c");
+    EXPECT_EQ(ds_decode64_1(T_VAL,true), "g");
+}
+
+TEST(kmercodec_test, dec64_1_a_ss) {
+    EXPECT_EQ(ss_decode64_1(A_VAL), "a");
+    EXPECT_EQ(ss_decode64_1(A_VAL,true), "t");
+}
+
+TEST(kmercodec_test, dec64_1_c_ss) {
+    EXPECT_EQ(ss_decode64_1(C_VAL), "c");
+    EXPECT_EQ(ss_decode64_1(C_VAL,true), "g");
+}
+
+TEST(kmercodec_test, dec64_1_g_ss) {
+    EXPECT_EQ(ss_decode64_1(G_VAL), "g");
+    EXPECT_EQ(ss_decode64_1(G_VAL,true), "c");
+}
+
+TEST(kmercodec_test, dec64_1_t_ss) {
+    EXPECT_EQ(ss_decode64_1(T_VAL), "t");
+    EXPECT_EQ(ss_decode64_1(T_VAL,true), "a");
+}
+
+TEST(kmercodec_test, dec64_3_acg) {
+    EXPECT_EQ(ds_decode64_3(A_VAL<<3|C_VAL<<2|G_VAL), "acg");
+    EXPECT_EQ(ds_decode64_3(A_VAL<<3|C_VAL<<2|G_VAL,true), "cgt");
+}
+
+TEST(kmercodec_test, dec64_3_acg_ss) {
+    EXPECT_EQ(ss_decode64_3(A_VAL<<3|C_VAL<<2|G_VAL), "acg");
+    EXPECT_EQ(ss_decode64_3(A_VAL<<3|C_VAL<<2|G_VAL,true), "cgt");
+}
+
+TEST(kmercodec_test, dec64_3_cgt_ss) {
+    EXPECT_EQ(ss_decode64_3(C_VAL<<4|G_VAL<<2|T_VAL), "cgt");
+    EXPECT_EQ(ss_decode64_3(C_VAL<<4|G_VAL<<2|T_VAL,true), "acg");
+}
+
+TEST(kmercodec_test, dec64_31_ds) {
+    std::uint64_t kmer = 
+        T_VAL<<28|A_VAL<<26|C_VAL<<24|C_VAL<<22|C_VAL<<20|T_VAL<<18|G_VAL<<16|
+        C_VAL<<14|A_VAL<<12|C_VAL<<10|C_VAL<<8 |C_VAL<<6 |A_VAL<<4 |C_VAL<<2 |G_VAL;
+    EXPECT_EQ(ds_decode64_31(kmer<<31|A_VAL<<30|kmer),"taccctgcacccacg" "a" "taccctgcacccacg");
+    EXPECT_EQ(ds_decode64_31(kmer<<31|A_VAL<<30|kmer,true),"cgtgggtgcagggta" "t" "cgtgggtgcagggta");
+}
+
+TEST(kmercodec_test, dec64_31_ss) {
+    std::uint64_t kmer = 
+        G_VAL<<28|A_VAL<<26|T_VAL<<24|G_VAL<<22|G_VAL<<20|T_VAL<<18|C_VAL<<16|
+        T_VAL<<14|T_VAL<<12|G_VAL<<10|C_VAL<<8 |C_VAL<<6 |C_VAL<<4 |C_VAL<<2 |G_VAL;
+    EXPECT_EQ(ss_decode64_31(kmer<<32|G_VAL<<30|kmer), "gatggtcttgccccg" "g" "gatggtcttgccccg");
+    EXPECT_EQ(ss_decode64_31(kmer<<32|G_VAL<<30|kmer,true), "cggggcaagaccatc" "c" "cggggcaagaccatc");
+}
+
+TEST(kmercodec_test, dec64_31_ds_inv) {
+    EXPECT_EQ(ds_decode64_31(INV64), "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
+    EXPECT_EQ(ds_decode64_31(-1), "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
+}
+
+TEST(kmercodec_test, dec64_31_ss_inv) {
+    EXPECT_EQ(ss_decode64_31(-1), "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
+}
+
+TEST(kmercodec_test, dec64_15_ds_invalid) {
+    std::uint64_t kmer = INV64|
+        T_VAL<<27|A_VAL<<25|C_VAL<<23|C_VAL<<21|C_VAL<<19|T_VAL<<17|G_VAL<<15|
+        C_VAL<<14|A_VAL<<12|C_VAL<<10|C_VAL<<8 |C_VAL<<6 |A_VAL<<4 |C_VAL<<2 |G_VAL;
+    EXPECT_EQ(ds_decode64_31(kmer),"XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
+    EXPECT_EQ(ds_decode64_31(kmer,true),"XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
+}
+
+TEST(kmercodec_test, dec64_31_ss_invalid) {
+    std::uint64_t kmer = INV64|
+        G_VAL<<28|A_VAL<<26|T_VAL<<24|G_VAL<<22|G_VAL<<20|T_VAL<<18|C_VAL<<16|
+        T_VAL<<14|T_VAL<<12|G_VAL<<10|C_VAL<<8 |C_VAL<<6 |C_VAL<<4 |C_VAL<<2 |G_VAL;
+    EXPECT_EQ(ss_decode64_31(kmer), "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
+    EXPECT_EQ(ss_decode64_31(kmer,true), "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
+}
+
+// ss_to_ds -------------------------------------------------------------
+
+TEST(kmercodec_test, ss_to_ds32) {
+    std::uint32_t kmer_ds;
+    kmer_ds = ss_to_ds<std::uint32_t,1>(A_VAL);
+    EXPECT_EQ(kmer_ds, A_VAL);
+    kmer_ds = ss_to_ds<std::uint32_t,1>(C_VAL);
+    EXPECT_EQ(kmer_ds, C_VAL);
+    kmer_ds = ss_to_ds<std::uint32_t,1>(G_VAL);
+    EXPECT_EQ(kmer_ds, C_VAL);
+    kmer_ds = ss_to_ds<std::uint32_t,1>(T_VAL);
+    EXPECT_EQ(kmer_ds, A_VAL);
+    std::uint32_t kmer = 
+        G_VAL<<28|A_VAL<<26|T_VAL<<24|G_VAL<<22|G_VAL<<20|T_VAL<<18|C_VAL<<16|
+        T_VAL<<14|T_VAL<<12|G_VAL<<10|C_VAL<<8 |C_VAL<<6 |C_VAL<<4 |C_VAL<<2 |G_VAL;
+    EXPECT_EQ(ss_decode32_15(kmer), "gatggtcttgccccg");
+    kmer_ds = ss_to_ds<std::uint32_t,15>(kmer);
+    EXPECT_EQ(ds_decode32_15(kmer_ds), "cggggcaagaccatc");
+}
+
+TEST(kmercodec_test, ss_to_ds32_3) {
+    std::uint32_t kmer_ds;
+    kmer_ds = ss_to_ds<std::uint32_t,3>(A_VAL<<4|C_VAL<<2|G_VAL);
+    EXPECT_EQ(kmer_ds, A_VAL<<3|C_VAL<<2|G_VAL);
+}
+
+TEST(kmercodec_test, ss_to_ds32_3_rc) {
+    std::uint32_t kmer_ds;
+    kmer_ds = ss_to_ds<std::uint32_t,3>(C_VAL<<4|G_VAL<<2|T_VAL);
+    EXPECT_EQ(kmer_ds, A_VAL<<3|C_VAL<<2|G_VAL);
+}
+
+TEST(kmercodec_test, ss_to_ds32_3_xchk) {
+    std::uint32_t kmer_ds, kmer_ds_rc;
+    kmer_ds    = ss_to_ds<std::uint32_t,3>(C_VAL<<4|T_VAL<<2|A_VAL);
+    kmer_ds_rc = ss_to_ds<std::uint32_t,3>(T_VAL<<4|A_VAL<<2|G_VAL);
+    EXPECT_EQ(kmer_ds, kmer_ds_rc);
+}
+
+TEST(kmercodec_test, ss_to_ds32_inv) {
+    std::uint32_t kmer_ds;
+    kmer_ds = ss_to_ds<std::uint32_t,3>(INV32|A_VAL<<4|C_VAL<<2|G_VAL);
+    EXPECT_EQ(kmer_ds & INV32, INV32);
+}
+
+// ss_revcomp -------------------------------------------------------------
+
+TEST(kmercodec_test, ss_revcomp32_1) {
+    std::uint32_t kmer_rc;
+    kmer_rc = ss_revcomp<std::uint32_t,1>(T_VAL);
+    EXPECT_EQ(kmer_rc, A_VAL);
+}
+
+TEST(kmercodec_test, ss_revcomp32_1_inv) {
+    std::uint32_t kmer_rc;
+    kmer_rc = ss_revcomp<std::uint32_t,1>(INV32|T_VAL);
+    EXPECT_EQ(kmer_rc & INV32, INV32);
+}
+
+TEST(kmercodec_test, ss_revcomp32_3) {
+    std::uint32_t kmer_rc;
+    kmer_rc = ss_revcomp<std::uint32_t,3>(T_VAL<<4|G_VAL<<2|C_VAL);
+    EXPECT_EQ(kmer_rc, G_VAL<<4|C_VAL<<2|A_VAL);
+}
+
+TEST(kmercodec_test, ss_revcomp32_3_inv) {
+    std::uint32_t kmer_rc;
+    kmer_rc = ss_revcomp<std::uint32_t,3>(INV32|T_VAL<<4|G_VAL<<2|C_VAL);
+    EXPECT_EQ(kmer_rc & INV32, INV32);
+}
+
+// encode_one -------------------------------------------------------------
+
+TEST(kmercodec_test, encode32_one_ksize_3) {
+    const char seq[] = "cgt";
+
+    std::uint32_t res = ss_encode_one<std::uint32_t,3>(seq);
+    EXPECT_EQ(27,res); // cgt -> 011011
+
+    res = ds_encode_one<std::uint32_t,3>(seq);
+    EXPECT_EQ(6,res);  // cgt -> acg -> 000110
+}
+
+TEST(kmercodec_test, encode32_ksize_3) {
+    const unsigned ksize = 3;
+    const char seq[] = "acgtca";
+    std::uint32_t res[sizeof(seq)-ksize];
+
+    ss_encode<std::uint32_t,3>(seq, seq+sizeof(seq)-1, res);
+    EXPECT_EQ(6,res[0]);  // acg -> 000110
+    EXPECT_EQ(27,res[1]); // cgt -> 011011
+    EXPECT_EQ(45,res[2]); // gtc -> 101101
+    EXPECT_EQ(52,res[3]); // tca -> 110100
+
+    ds_encode<std::uint32_t,3>(seq, seq+sizeof(seq)-1, res);
+    EXPECT_EQ(6,res[0]);  // acg -> 00110
+    EXPECT_EQ(6,res[1]);  // cgt -> acg -> 00110
+    EXPECT_EQ(17,res[2]); // gtc -> gac -> 10001
+    EXPECT_EQ(28,res[3]); // tca -> 11100
+}
+
 /*
-TEST(kmercodec_test, ksize_is_string) {
-    encoder32 c(7);
-    vector32 r1 = c.encode("acgtaaa");
-    EXPECT_EQ(r1.size(), 1);
-}
-
-TEST(kmercodec_test, ksize_longer_than_string) {
-    encoder32 c(7);
-    vector32 r1 = c.encode("acgtaa");
-    EXPECT_EQ(r1.size(), 0);
-}
-
-TEST(kmercodec_test, reverse_long) {
-    const int k = 7;
-    encoder32 c(k);
-
-    char seq[] = "acgattagcgatagggt";
-    char rev[] = "accctatcgctaatcgt";
-
-    vector32 r1 = c.encode(seq);
-    vector32 r2 = c.encode(rev);
-
-    ASSERT_EQ(r1.size(), sizeof(seq)-k);
-    ASSERT_EQ(r2.size(), sizeof(rev)-k);
-    v32iter p1 = r1.begin(); 
-    r32iter p2 = r2.rbegin();
-    for (; p1 != r1.end() && p2 != r2.rend(); ++p1, ++p2)
-        EXPECT_EQ(*p1, *p2);
-}
-
-TEST(kmercodec_test, encode_ksize_3) {
-    encoder32 c(3);
-    char seq[] = "acgtca";
-    vector32 r1 = c.encode(seq);
-    ASSERT_EQ(r1.size(),4); // acg -> 00110
-    EXPECT_EQ(6,r1[0]); // acg -> 00110
-    EXPECT_EQ(6,r1[1]); // cgt -> acg -> 00110
-    EXPECT_EQ(17,r1[2]); // gtc -> gac -> 10001
-    EXPECT_EQ(28,r1[3]); // tca -> 11100
-}
-
-TEST(kmercodec_test, encode_ksize_3_ss) {
-    encoder32 c(3, true);
-    char seq[] = "acgtca";
-    vector32 r1 = c.encode(seq);
-    ASSERT_EQ(r1.size(),4);
-    EXPECT_EQ(6,r1[0]);  // acg -> 000110
-    EXPECT_EQ(27,r1[1]); // cgt -> 011011
-    EXPECT_EQ(45,r1[2]); // gtc -> 101101
-    EXPECT_EQ(52,r1[3]); // tca -> 110100
-}
-
 TEST(kmercodec_test, encode_ksize_15) {
     char seq[] = "gaatctgcccagcac"; // 10 0000 1101 1110 (0)101 0100 1001 0001
     const std::uint32_t r_canonical = 0x106F5491, r_sstrand = 0x20DE5491;
@@ -191,6 +420,29 @@ TEST(kmercodec_test, encode_ksize_31) {
     EXPECT_EQ(r_canonical,r64c[0]);
 }
 
+// ss_encode --------------------------------------------------------------
+
+TEST(kmercodec_test, reverse_encode) {
+    const int k = 7;
+    encoder32 c(k);
+
+    char seq[] = "acgattagcgatagggt";
+    char rev[] = "accctatcgctaatcgt";
+    
+
+    vector32 r1 = c.encode(seq);
+    vector32 r2 = c.encode(rev);
+
+    ASSERT_EQ(r1.size(), sizeof(seq)-k);
+    ASSERT_EQ(r2.size(), sizeof(rev)-k);
+    v32iter p1 = r1.begin(); 
+    r32iter p2 = r2.rbegin();
+    for (; p1 != r1.end() && p2 != r2.rend(); ++p1, ++p2)
+        EXPECT_EQ(*p1, *p2);
+}
+*/
+// ds_encode --------------------------------------------------------------
+/*
 // invalid input --------------------------------------------------------
 
 TEST(kmercodec_test, invalid32) {

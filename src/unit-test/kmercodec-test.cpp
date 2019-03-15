@@ -283,7 +283,7 @@ TEST(kmercodec_test, dec64_31_ss_invalid) {
     EXPECT_EQ(ss_decode64_31(kmer,true), "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
 }
 
-// ss_to_ds -------------------------------------------------------------
+// ss_to_ds 32 ----------------------------------------------------------
 
 TEST(kmercodec_test, ss_to_ds32) {
     std::uint32_t kmer_ds;
@@ -328,6 +328,59 @@ TEST(kmercodec_test, ss_to_ds32_inv) {
     EXPECT_EQ(kmer_ds & INV32, INV32);
 }
 
+// ss_to_ds 64 -------------------------------------------------------------
+
+TEST(kmercodec_test, ss_to_ds64) {
+    std::uint64_t kmer_ds;
+    kmer_ds = ss_to_ds<std::uint64_t,1>(A_VAL);
+    EXPECT_EQ(kmer_ds, A_VAL);
+    kmer_ds = ss_to_ds<std::uint64_t,1>(C_VAL);
+    EXPECT_EQ(kmer_ds, C_VAL);
+    kmer_ds = ss_to_ds<std::uint64_t,1>(G_VAL);
+    EXPECT_EQ(kmer_ds, C_VAL);
+    kmer_ds = ss_to_ds<std::uint64_t,1>(T_VAL);
+    EXPECT_EQ(kmer_ds, A_VAL);
+
+    std::uint64_t kmer = 
+        (std::uint64_t)A_VAL<<60|
+        (std::uint64_t)G_VAL<<58|(std::uint64_t)A_VAL<<56|(std::uint64_t)T_VAL<<54|
+        (std::uint64_t)G_VAL<<52|(std::uint64_t)G_VAL<<50|(std::uint64_t)T_VAL<<48|
+        (std::uint64_t)C_VAL<<46|(std::uint64_t)T_VAL<<44|(std::uint64_t)T_VAL<<42|
+        (std::uint64_t)G_VAL<<40|(std::uint64_t)C_VAL<<38|(std::uint64_t)C_VAL<<36|
+        (std::uint64_t)C_VAL<<34|(std::uint64_t)C_VAL<<32|
+        T_VAL<<30|
+        G_VAL<<28|A_VAL<<26|T_VAL<<24|G_VAL<<22|G_VAL<<20|T_VAL<<18|C_VAL<<16|
+        T_VAL<<14|T_VAL<<12|G_VAL<<10|C_VAL<<8 |C_VAL<<6 |C_VAL<<4 |C_VAL<<2 |G_VAL;
+    EXPECT_EQ(ss_decode64_31(kmer), "a""gatggtcttgcccc""t""gatggtcttgccccg");
+    kmer_ds = ss_to_ds<std::uint64_t,31>(kmer);
+    EXPECT_EQ(ds_decode64_31(kmer_ds), "cggggcaagaccatc""a""ggggcaagaccatc""t");
+}
+
+TEST(kmercodec_test, ss_to_ds64_3) {
+    std::uint64_t kmer_ds;
+    kmer_ds = ss_to_ds<std::uint64_t,3>(A_VAL<<4|C_VAL<<2|G_VAL);
+    EXPECT_EQ(kmer_ds, A_VAL<<3|C_VAL<<2|G_VAL);
+}
+
+TEST(kmercodec_test, ss_to_ds64_3_rc) {
+    std::uint64_t kmer_ds;
+    kmer_ds = ss_to_ds<std::uint64_t,3>(C_VAL<<4|G_VAL<<2|T_VAL);
+    EXPECT_EQ(kmer_ds, A_VAL<<3|C_VAL<<2|G_VAL);
+}
+
+TEST(kmercodec_test, ss_to_ds64_3_xchk) {
+    std::uint64_t kmer_ds, kmer_ds_rc;
+    kmer_ds    = ss_to_ds<std::uint64_t,3>(C_VAL<<4|T_VAL<<2|A_VAL);
+    kmer_ds_rc = ss_to_ds<std::uint64_t,3>(T_VAL<<4|A_VAL<<2|G_VAL);
+    EXPECT_EQ(kmer_ds, kmer_ds_rc);
+}
+
+TEST(kmercodec_test, ss_to_ds64_inv) {
+    std::uint64_t kmer_ds;
+    kmer_ds = ss_to_ds<std::uint64_t,3>(INV64|A_VAL<<4|C_VAL<<2|G_VAL);
+    EXPECT_EQ(kmer_ds & INV64, INV64);
+}
+
 // ss_revcomp -------------------------------------------------------------
 
 TEST(kmercodec_test, ss_revcomp32_1) {
@@ -352,6 +405,32 @@ TEST(kmercodec_test, ss_revcomp32_3_inv) {
     std::uint32_t kmer_rc;
     kmer_rc = ss_revcomp<std::uint32_t,3>(INV32|T_VAL<<4|G_VAL<<2|C_VAL);
     EXPECT_EQ(kmer_rc & INV32, INV32);
+}
+
+// ss_revcomp 64 -------------------------------------------------------------
+
+TEST(kmercodec_test, ss_revcomp64_1) {
+    std::uint64_t kmer_rc;
+    kmer_rc = ss_revcomp<std::uint32_t,1>(T_VAL);
+    EXPECT_EQ(kmer_rc, A_VAL);
+}
+
+TEST(kmercodec_test, ss_revcomp64_1_inv) {
+    std::uint64_t kmer_rc;
+    kmer_rc = ss_revcomp<std::uint64_t,1>(INV64|T_VAL);
+    EXPECT_EQ(kmer_rc & INV64, INV64);
+}
+
+TEST(kmercodec_test, ss_revcomp64_3) {
+    std::uint64_t kmer_rc;
+    kmer_rc = ss_revcomp<std::uint64_t,3>(T_VAL<<4|G_VAL<<2|C_VAL);
+    EXPECT_EQ(kmer_rc, G_VAL<<4|C_VAL<<2|A_VAL);
+}
+
+TEST(kmercodec_test, ss_revcomp64_3_inv) {
+    std::uint64_t kmer_rc;
+    kmer_rc = ss_revcomp<std::uint64_t,3>(INV64|T_VAL<<4|G_VAL<<2|C_VAL);
+    EXPECT_EQ(kmer_rc & INV64, INV64);
 }
 
 // encode_one -------------------------------------------------------------
@@ -384,242 +463,91 @@ TEST(kmercodec_test, encode32_ksize_3) {
     EXPECT_EQ(28,res[3]); // tca -> 11100
 }
 
-/*
-TEST(kmercodec_test, encode_ksize_15) {
+TEST(kmercodec_test, encode32_ksize_15) {
     char seq[] = "gaatctgcccagcac"; // 10 0000 1101 1110 (0)101 0100 1001 0001
-    const std::uint32_t r_canonical = 0x106F5491, r_sstrand = 0x20DE5491;
+    std::uint32_t r32s[sizeof(seq)-15];
+    std::uint32_t r32d[sizeof(seq)-15];
+    std::uint64_t r64s[sizeof(seq)-15];
+    std::uint64_t r64d[sizeof(seq)-15];
+    const std::uint32_t r_ds = 0x106F5491, r_ss = 0x20DE5491;
     
-    vector32 r32s = encoder32(15,true).encode(seq);
-    ASSERT_EQ(r32s.size(),1);
-    EXPECT_EQ(r_sstrand,r32s[0]);
+    ss_encode<std::uint32_t,15>(seq, seq+sizeof(seq)-1, r32s);
+    EXPECT_EQ(r_ss,r32s[0]);
 
-    vector32 r32c = encoder32(15).encode(seq);
-    ASSERT_EQ(r32c.size(),1);
-    EXPECT_EQ(r_canonical,r32c[0]);
+    ds_encode<std::uint32_t,15>(seq, seq+sizeof(seq)-1, r32d);
+    EXPECT_EQ(r_ds,r32d[0]);
 
-    vector64 r64s = encoder64(15,true).encode(seq);
-    ASSERT_EQ(r64s.size(),1);
-    EXPECT_EQ(r_sstrand,r64s[0]);
+    ss_encode<std::uint64_t,15>(seq, seq+sizeof(seq)-1, r64s);
+    EXPECT_EQ(r_ss,r64s[0]);
 
-    vector64 r64c = encoder64(15).encode(seq);
-    ASSERT_EQ(r64c.size(),1);
-    EXPECT_EQ(r_canonical,r64c[0]);
+    ds_encode<std::uint64_t,15>(seq, seq+sizeof(seq)-1, r64d);
+    EXPECT_EQ(r_ds,r64d[0]);
 }
 
 TEST(kmercodec_test, encode_ksize_31) {
     char seq[] = "TAAGCGTTTGCTATGCCATCCCATCGGGCCA"; 
     // 11 0000 1001 1011 1111 1001 1100 1110 (0)101 0011 0101 0100 1101 1010 1001 0100
-    const std::uint64_t r_canonical = 0x184DFCE75354DA94, r_sstrand = 0x309BF9CE5354DA94;
+    std::uint64_t r64s[sizeof(seq)-15];
+    std::uint64_t r64d[sizeof(seq)-15];
+    const std::uint64_t r_ds = 0x184DFCE75354DA94, r_ss = 0x309BF9CE5354DA94;
     
-    vector64 r64s = encoder64(31,true).encode(seq);
-    ASSERT_EQ(r64s.size(),1);
-    EXPECT_EQ(r_sstrand,r64s[0]);
+    ss_encode<std::uint64_t,31>(seq, seq+sizeof(seq)-1, r64s);
+    EXPECT_EQ(r_ss,r64s[0]);
 
-    vector64 r64c = encoder64(31).encode(seq);
-    ASSERT_EQ(r64c.size(),1);
-    EXPECT_EQ(r_canonical,r64c[0]);
+    ds_encode<std::uint64_t,31>(seq, seq+sizeof(seq)-1, r64d);
+    EXPECT_EQ(r_ds,r64d[0]);
 }
 
-// ss_encode --------------------------------------------------------------
-
-TEST(kmercodec_test, reverse_encode) {
-    const int k = 7;
-    encoder32 c(k);
-
-    char seq[] = "acgattagcgatagggt";
-    char rev[] = "accctatcgctaatcgt";
-    
-
-    vector32 r1 = c.encode(seq);
-    vector32 r2 = c.encode(rev);
-
-    ASSERT_EQ(r1.size(), sizeof(seq)-k);
-    ASSERT_EQ(r2.size(), sizeof(rev)-k);
-    v32iter p1 = r1.begin(); 
-    r32iter p2 = r2.rbegin();
-    for (; p1 != r1.end() && p2 != r2.rend(); ++p1, ++p2)
-        EXPECT_EQ(*p1, *p2);
-}
-*/
-// ds_encode --------------------------------------------------------------
-/*
 // invalid input --------------------------------------------------------
 
 TEST(kmercodec_test, invalid32) {
-    encoder32 c(3);
     char seq[] = "cgn";
-    vector32 r1 = c.encode(seq);
-    ASSERT_EQ(r1.size(),1);
-    EXPECT_TRUE(c.is_invalid(r1[0]));
+    std::uint32_t res[sizeof(seq)-3];
+    ds_encode<std::uint32_t,3>(seq, seq+sizeof(seq)-1, res);
+    EXPECT_TRUE(res[0] & high_bit<std::uint32_t>);
 }
 
 TEST(kmercodec_test, invalid32_pos1) {
-    vector32 r1 = encoder32(5).encode("aaaacn");
-    ASSERT_EQ(r1.size(),2);
-    EXPECT_EQ(r1[0], 1);
-    EXPECT_TRUE(encoder32::is_invalid(r1[1]));
+    char seq[] = "aaaacn";
+    std::uint32_t res[5];
+    ds_encode<std::uint32_t,5>(seq, seq+sizeof(seq)-1, res);
+    EXPECT_EQ(res[0], 1);
+    EXPECT_TRUE(res[1] & high_bit<std::uint32_t>);
 }
 
 TEST(kmercodec_test, invalid32_mid) {
-    vector32 r1 = encoder32(5).encode("aaaacngtttt");
-    ASSERT_EQ(r1.size(),7);
-    EXPECT_EQ(r1[0], 1);
-    EXPECT_TRUE(encoder32::is_invalid(r1[1]));
-    EXPECT_TRUE(encoder32::is_invalid(r1[2]));
-    EXPECT_TRUE(encoder32::is_invalid(r1[3]));
-    EXPECT_TRUE(encoder32::is_invalid(r1[4]));
-    EXPECT_TRUE(encoder32::is_invalid(r1[5]));
-    EXPECT_EQ(r1[6], 1);
+    char seq[] = "aaaacngtttt";
+    std::uint32_t res[5];
+    ds_encode<std::uint32_t,5>(seq, seq+sizeof(seq)-1, res);
+    EXPECT_EQ(res[0], 1);
+    EXPECT_TRUE(res[1] & high_bit<std::uint32_t>);
+    EXPECT_TRUE(res[2] & high_bit<std::uint32_t>);
+    EXPECT_TRUE(res[3] & high_bit<std::uint32_t>);
+    EXPECT_TRUE(res[4] & high_bit<std::uint32_t>);
+    EXPECT_TRUE(res[5] & high_bit<std::uint32_t>);
+    EXPECT_EQ(res[6], 1);
 }
 
 TEST(kmercodec_test, invalid64) {
-    encoder64 c(3);
     char seq[] = "cgn";
-    std::vector<std::uint64_t> r1 = c.encode(seq);
-    EXPECT_EQ(r1.size(),1);
-    EXPECT_TRUE(c.is_invalid(r1[0]));
+    std::uint64_t res[sizeof(seq)-3];
+    ds_encode<std::uint64_t,3>(seq, seq+sizeof(seq)-1, res);
+    EXPECT_TRUE(res[0] & high_bit<std::uint64_t>);
 }
 
 TEST(kmercodec_test, invalid64_mid) {
-    vector64 r1 = encoder64(5).encode("aaaacngtttt");
-    ASSERT_EQ(r1.size(),7);
-    EXPECT_EQ(r1[0], 1);
-    EXPECT_TRUE(encoder64::is_invalid(r1[1]));
-    EXPECT_TRUE(encoder64::is_invalid(r1[2]));
-    EXPECT_TRUE(encoder64::is_invalid(r1[3]));
-    EXPECT_TRUE(encoder64::is_invalid(r1[4]));
-    EXPECT_TRUE(encoder64::is_invalid(r1[5]));
-    EXPECT_EQ(r1[6], 1);
+    char seq[] = "aaaacngtttt";
+    std::uint64_t res[5];
+    ds_encode<std::uint64_t,5>(seq, seq+sizeof(seq)-1, res);
+    EXPECT_EQ(res[0], 1);
+    EXPECT_TRUE(res[1] & high_bit<std::uint64_t>);
+    EXPECT_TRUE(res[2] & high_bit<std::uint64_t>);
+    EXPECT_TRUE(res[3] & high_bit<std::uint64_t>);
+    EXPECT_TRUE(res[4] & high_bit<std::uint64_t>);
+    EXPECT_TRUE(res[5] & high_bit<std::uint64_t>);
+    EXPECT_EQ(res[6], 1);
 }
 
-// encoding and decoding ------------------------------------------------
 
-const int KBASE = 1000;
-static const char dna[KBASE+1] = 
-    "gtcagcataagattttgttacgctttcaatcctggagaacggctggccaggtagtgtgccaaaagagtgctgagtaagcgagagtgcgctggtgtgccta"
-    "ttcgaaataagttttgcgagaatgctgtcaccatgggggactcatattgattagacgtatgaaggtttcgagttatttacgataaaagcaacttctgtag"
-    "tcagtctcgagttgcgtcgaaccacttgtgcccacgtcattcctacgcgcttttcgcattgcttttccctgggtgtacatgtcgagacaatgtctagagg"
-    "agtgcagcataaaccgaggatgtatgtgacccctgacatctattggacaaccctcagccgcggctgcgtttggttgtaccaaactcacctaaaattgcta"
-    "tgaatgagcgctaacgttaacgtacttatgctttaggcgtaccgactcaagccattcacctaatcccgaataatgcctccgcacaagtggttttaacagg"
-    "tataccgcccggtaacgtagggaactctcccttgtgaggaattgtgagttttaccactttgttccgaaaaatcgtgcagccgcccgccatgcctcgctga"
-    "cctcacaatgtgaccggtgcgaagagacgtccggcatcttccccctgactacaaacttcgcattcgctcggtcatctattgcggcttttactacaactaa"
-    "taaactatcctaagattctcgagaaatgtagcctttgagaagccgatcggcagtgaatgatatcctcagcatcaaaggctctacgtgctttaaaacgtac"
-    "tatccgttatgcgcaaccataacgtcggcgcgagggcccttctgaccactctacccatccggtacctccccatggtgttggtattgggcgacaatgtaat"
-    "aaactaccacgcggagcacctgatacggaacatttttgatgtttcctggaccgctcccacgcatggcgcaacagagaaagcagggtattccctgaggctt";
-
-TEST(kmercodec_test, enencoder32_1kbase) {
-
-    for (int ksize = 1; ksize <= encoder32::max_ksize; ksize += 2) {   // loop over all possible k-sizes (canonical)
-        encoder32 c(ksize);
-        vector32 r = c.encode(dna);
-        ASSERT_EQ(r.size(), KBASE-ksize+1);
-
-        for (const char *p = dna; p != dna + KBASE - ksize + 1; ++p) {
-            std::string s(p, p+ksize);
-            char m = p[ksize/2];
-            ASSERT_EQ(s, c.decode(r[p-dna], m == 'g' || m == 't'));
-        }
-    }
-}
-
-TEST(kmercodec_test, enencoder32ss_1kbase) {
-
-    for (int ksize = 1; ksize <= encoder32::max_ksize; ++ksize) {  // loop over all k-sizes
-        encoder32 c(ksize, true);
-        vector32 r = c.encode(dna);
-        ASSERT_EQ(r.size(), KBASE-ksize+1);
-
-        for (const char *p = dna; p != dna + KBASE - ksize + 1; ++p) {
-            std::string s(p, p+ksize);
-            ASSERT_EQ(s, c.decode(r[p-dna]));
-        }
-    }
-}
-
-TEST(kmercodec_test, enencoder64_1kbase) {
-
-    for (int ksize = 1; ksize <= encoder64::max_ksize; ksize += 2) {   // loop over all possible k-sizes (canonical)
-        encoder64 c(ksize);
-        vector64 r = c.encode(dna);
-        ASSERT_EQ(r.size(), KBASE-ksize+1);
-
-        for (const char *p = dna; p != dna + KBASE - ksize + 1; ++p) {
-            std::string s(p, p+ksize);
-            char m = p[ksize/2];
-            ASSERT_EQ(s, c.decode(r[p-dna], m == 'g' || m == 't'));
-        }
-    }
-}
-
-TEST(kmercodec_test, enencoder64ss_1kbase) {
-
-    for (int ksize = 1; ksize <= encoder64::max_ksize; ++ksize) {  // loop over all k-sizes
-        encoder64 c(ksize, true);
-        vector64 r = c.encode(dna);
-        ASSERT_EQ(r.size(), KBASE-ksize+1);
-
-        for (const char *p = dna; p != dna + KBASE - ksize + 1; ++p) {
-            std::string s(p, p+ksize);
-            ASSERT_EQ(s, c.decode(r[p-dna]));
-        }
-    }
-}
-
-static const char rc_dna[KBASE+1] =
-    "aagcctcagggaataccctgctttctctgttgcgccatgcgtgggagcggtccaggaaacatcaaaaatgttccgtatcaggtgctccgcgtggtagttt"
-    "attacattgtcgcccaataccaacaccatggggaggtaccggatgggtagagtggtcagaagggccctcgcgccgacgttatggttgcgcataacggata"
-    "gtacgttttaaagcacgtagagcctttgatgctgaggatatcattcactgccgatcggcttctcaaaggctacatttctcgagaatcttaggatagttta"
-    "ttagttgtagtaaaagccgcaatagatgaccgagcgaatgcgaagtttgtagtcagggggaagatgccggacgtctcttcgcaccggtcacattgtgagg"
-    "tcagcgaggcatggcgggcggctgcacgatttttcggaacaaagtggtaaaactcacaattcctcacaagggagagttccctacgttaccgggcggtata"
-    "cctgttaaaaccacttgtgcggaggcattattcgggattaggtgaatggcttgagtcggtacgcctaaagcataagtacgttaacgttagcgctcattca"
-    "tagcaattttaggtgagtttggtacaaccaaacgcagccgcggctgagggttgtccaatagatgtcaggggtcacatacatcctcggtttatgctgcact"
-    "cctctagacattgtctcgacatgtacacccagggaaaagcaatgcgaaaagcgcgtaggaatgacgtgggcacaagtggttcgacgcaactcgagactga"
-    "ctacagaagttgcttttatcgtaaataactcgaaaccttcatacgtctaatcaatatgagtcccccatggtgacagcattctcgcaaaacttatttcgaa"
-    "taggcacaccagcgcactctcgcttactcagcactcttttggcacactacctggccagccgttctccaggattgaaagcgtaacaaaatcttatgctgac";
-
-TEST(kmercodec_test, enencoder32_1kbase_rc) {
-
-    for (int ksize = 1; ksize <= 16; ksize += 2) {   // loop over all possible k-sizes (canonical)
-
-        encoder32 c(ksize);
-
-        // encode the forward
-        vector32 f = c.encode(dna);
-        ASSERT_EQ(f.size(), KBASE-ksize+1);
-
-        // encode the reverse
-        vector32 r = c.encode(rc_dna);
-        ASSERT_EQ(r.size(), KBASE-ksize+1);
-
-        // check that they're equal
-        v32iter fi = f.begin();
-        r32iter ri = r.rbegin();
-        for (; fi != f.end() && ri != r.rend(); ++fi, ++ri)
-            ASSERT_EQ(*fi, *ri);
-    }
-}
-
-TEST(kmercodec_test, enencoder64_1kbase_rc) {
-
-    for (int ksize = 1; ksize <= encoder64::max_ksize; ksize += 2) {   // loop over all possible k-sizes (canonical)
-
-        encoder64 c(ksize);
-
-        // encode the forward
-        vector64 f = c.encode(dna);
-        ASSERT_EQ(f.size(), KBASE-ksize+1);
-
-        // encode the reverse
-        vector64 r = c.encode(rc_dna);
-        ASSERT_EQ(r.size(), KBASE-ksize+1);
-
-        // check that they're equal
-        v64iter fi = f.begin();
-        r64iter ri = r.rbegin();
-        for (; fi != f.end() && ri != r.rend(); ++fi, ++ri)
-            ASSERT_EQ(*fi, *ri);
-    }
-}
-*/
 } // namespace
   // vim: sts=4:sw=4:ai:si:et

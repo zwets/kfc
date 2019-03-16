@@ -188,7 +188,9 @@ ss_to_ds(kmer_t kmer)
     return ((out & (half_mask << ksize)) >> 1) | (out & (high_bit<kmer_t> | half_mask));
 }
 
+
 // --- ds encode ---------------------------------------------------------
+
 
 // ds_encode_one - double-strand encode single kmer
 //

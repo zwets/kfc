@@ -19,6 +19,7 @@
 #include <gtest/gtest.h>
 #include "kmerencoder.h"
 #include "utils.h"
+#include "allocator.h"
 
 using namespace kfc;
 

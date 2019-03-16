@@ -31,15 +31,16 @@ USER_HEADERS = \
 	$(USER_DIR)/bitfiddle.h \
 	$(USER_DIR)/basecodec.h \
 	$(USER_DIR)/kmercodec.h \
-	#$(USER_DIR)/kmerencoder.h \
+	$(USER_DIR)/kmerencoder.h \
 	#$(USER_DIR)/kmercounter.h \
 	#$(USER_DIR)/tallyman.h \
 	#$(USER_DIR)/seqreader.h \
 	#$(USER_DIR)/utils.h
 
 USER_OBJS = \
-	#seqreader.o \
-	#utils.o
+	kmerencoder.o \
+	seqreader.o \
+	utils.o
 
 ifeq (,$(wildcard /usr/include/boost/iostreams/filter/gzip.hpp))
   CXXFLAGS += -DNO_GZIP
@@ -51,10 +52,10 @@ TEST_OBJS = \
 	bitfiddle-test.o \
 	basecodec-test.o \
 	kmercodec-test.o \
-	#kmerencoder-test.o \
+	kmerencoder-test.o \
+	#kmercounter-test.o \
 	#seqreader-test.o \
 	#tallyman-test.o \
-	#kmercounter-test.o \
 
 # Build targets.
 

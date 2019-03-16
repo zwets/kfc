@@ -19,7 +19,6 @@
 #include <gtest/gtest.h>
 #include "kmerencoder.h"
 #include "utils.h"
-#include "allocator.h"
 
 using namespace kfc;
 
@@ -300,7 +299,7 @@ static const char dna[KBASE+1] =
 
 TEST(kmerencoder_test, enencoder32_1kbase) {
 
-    for (int ksize = 1; ksize <= encoder32::max_ksize; ksize += 2) {   // loop over all possible k-sizes (canonical)
+    for (unsigned ksize = 1; ksize <= encoder32::max_ksize; ksize += 2) {   // loop over all possible k-sizes (canonical)
         encoder32 c(ksize);
         vector32 r = c.encode(dna);
         ASSERT_EQ(r.size(), KBASE-ksize+1);
@@ -315,7 +314,7 @@ TEST(kmerencoder_test, enencoder32_1kbase) {
 
 TEST(kmerencoder_test, enencoder32ss_1kbase) {
 
-    for (int ksize = 1; ksize <= encoder32::max_ksize; ++ksize) {  // loop over all k-sizes
+    for (unsigned ksize = 1; ksize <= encoder32::max_ksize; ++ksize) {  // loop over all k-sizes
         encoder32 c(ksize, true);
         vector32 r = c.encode(dna);
         ASSERT_EQ(r.size(), KBASE-ksize+1);
@@ -329,7 +328,7 @@ TEST(kmerencoder_test, enencoder32ss_1kbase) {
 
 TEST(kmerencoder_test, enencoder64_1kbase) {
 
-    for (int ksize = 1; ksize <= encoder64::max_ksize; ksize += 2) {   // loop over all possible k-sizes (canonical)
+    for (unsigned ksize = 1; ksize <= encoder64::max_ksize; ksize += 2) {   // loop over all possible k-sizes (canonical)
         encoder64 c(ksize);
         vector64 r = c.encode(dna);
         ASSERT_EQ(r.size(), KBASE-ksize+1);
@@ -344,7 +343,7 @@ TEST(kmerencoder_test, enencoder64_1kbase) {
 
 TEST(kmerencoder_test, enencoder64ss_1kbase) {
 
-    for (int ksize = 1; ksize <= encoder64::max_ksize; ++ksize) {  // loop over all k-sizes
+    for (unsigned ksize = 1; ksize <= encoder64::max_ksize; ++ksize) {  // loop over all k-sizes
         encoder64 c(ksize, true);
         vector64 r = c.encode(dna);
         ASSERT_EQ(r.size(), KBASE-ksize+1);
@@ -370,7 +369,7 @@ static const char rc_dna[KBASE+1] =
 
 TEST(kmerencoder_test, enencoder32_1kbase_rc) {
 
-    for (int ksize = 1; ksize <= 16; ksize += 2) {   // loop over all possible k-sizes (canonical)
+    for (unsigned ksize = 1; ksize <= 16; ksize += 2) {   // loop over all possible k-sizes (canonical)
 
         encoder32 c(ksize);
 
@@ -392,7 +391,7 @@ TEST(kmerencoder_test, enencoder32_1kbase_rc) {
 
 TEST(kmerencoder_test, enencoder64_1kbase_rc) {
 
-    for (int ksize = 1; ksize <= encoder64::max_ksize; ksize += 2) {   // loop over all possible k-sizes (canonical)
+    for (unsigned ksize = 1; ksize <= encoder64::max_ksize; ksize += 2) {   // loop over all possible k-sizes (canonical)
 
         encoder64 c(ksize);
 

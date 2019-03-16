@@ -445,6 +445,17 @@ TEST(kmercodec_test, encode32_one_ksize_3) {
     EXPECT_EQ(6,res);  // cgt -> acg -> 000110
 }
 
+TEST(kmercodec_test, encode32_fwd_and_rev) {
+    const char seq[] = "acgattagcgatagggt";
+    const char rev[] = "accctatcgctaatcgt";
+
+    for (unsigned i = 0; i < sizeof(seq)-7; ++i) {
+        std::uint32_t kmer1 = ds_encode_one<std::uint32_t,7>(seq+i);
+        std::uint32_t kmer2 = ds_encode_one<std::uint32_t,7>(rev+10-i);
+        EXPECT_EQ(kmer1,kmer2);
+    }
+}
+
 TEST(kmercodec_test, encode32_ksize_3) {
     const unsigned ksize = 3;
     const char seq[] = "acgtca";

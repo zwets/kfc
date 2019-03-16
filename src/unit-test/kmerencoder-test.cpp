@@ -90,16 +90,16 @@ TEST(kmerencoder_test, ksize_dec1_c) {
     EXPECT_EQ(c.decode(C_VAL,true), "g");
 }
 
-TEST(kmerencoder_test, ksize_dec1_g_is_invalid) {
+TEST(kmerencoder_test, ksize_dec1_g_is_a) {
     encoder32 c(1);
-    EXPECT_EQ(c.decode(G_VAL), "invalid");
-    EXPECT_EQ(c.decode(G_VAL,true), "invalid");
+    EXPECT_EQ(c.decode(G_VAL), "a");
+    EXPECT_EQ(c.decode(G_VAL,true), "t");
 }
 
-TEST(kmerencoder_test, ksize_dec1_t_is_invalid) {
+TEST(kmerencoder_test, ksize_dec1_t_is_c) {
     encoder32 c(1);
-    EXPECT_EQ(c.decode(T_VAL), "invalid");
-    EXPECT_EQ(c.decode(T_VAL,true), "invalid");
+    EXPECT_EQ(c.decode(T_VAL), "c");
+    EXPECT_EQ(c.decode(T_VAL,true), "g");
 }
 
 TEST(kmerencoder_test, ksize_dec1_a_ss) {
@@ -170,7 +170,7 @@ TEST(kmerencoder_test, reverse_long) {
 
     ASSERT_EQ(r1.size(), sizeof(seq)-k);
     ASSERT_EQ(r2.size(), sizeof(rev)-k);
-    v32iter p1 = r1.begin(); 
+    v32iter p1 = r1.begin();
     r32iter p2 = r2.rbegin();
     for (; p1 != r1.end() && p2 != r2.rend(); ++p1, ++p2)
         EXPECT_EQ(*p1, *p2);
@@ -297,7 +297,7 @@ static const char dna[KBASE+1] =
     "tatccgttatgcgcaaccataacgtcggcgcgagggcccttctgaccactctacccatccggtacctccccatggtgttggtattgggcgacaatgtaat"
     "aaactaccacgcggagcacctgatacggaacatttttgatgtttcctggaccgctcccacgcatggcgcaacagagaaagcagggtattccctgaggctt";
 
-TEST(kmerencoder_test, enencoder32_1kbase) {
+TEST(kmerencoder_test, encoder32_1kbase) {
 
     for (unsigned ksize = 1; ksize <= encoder32::max_ksize; ksize += 2) {   // loop over all possible k-sizes (canonical)
         encoder32 c(ksize);
@@ -312,7 +312,7 @@ TEST(kmerencoder_test, enencoder32_1kbase) {
     }
 }
 
-TEST(kmerencoder_test, enencoder32ss_1kbase) {
+TEST(kmerencoder_test, encoder32ss_1kbase) {
 
     for (unsigned ksize = 1; ksize <= encoder32::max_ksize; ++ksize) {  // loop over all k-sizes
         encoder32 c(ksize, true);
@@ -326,7 +326,7 @@ TEST(kmerencoder_test, enencoder32ss_1kbase) {
     }
 }
 
-TEST(kmerencoder_test, enencoder64_1kbase) {
+TEST(kmerencoder_test, encoder64_1kbase) {
 
     for (unsigned ksize = 1; ksize <= encoder64::max_ksize; ksize += 2) {   // loop over all possible k-sizes (canonical)
         encoder64 c(ksize);
@@ -341,7 +341,7 @@ TEST(kmerencoder_test, enencoder64_1kbase) {
     }
 }
 
-TEST(kmerencoder_test, enencoder64ss_1kbase) {
+TEST(kmerencoder_test, encoder64ss_1kbase) {
 
     for (unsigned ksize = 1; ksize <= encoder64::max_ksize; ++ksize) {  // loop over all k-sizes
         encoder64 c(ksize, true);
@@ -367,7 +367,7 @@ static const char rc_dna[KBASE+1] =
     "ctacagaagttgcttttatcgtaaataactcgaaaccttcatacgtctaatcaatatgagtcccccatggtgacagcattctcgcaaaacttatttcgaa"
     "taggcacaccagcgcactctcgcttactcagcactcttttggcacactacctggccagccgttctccaggattgaaagcgtaacaaaatcttatgctgac";
 
-TEST(kmerencoder_test, enencoder32_1kbase_rc) {
+TEST(kmerencoder_test, encoder32_1kbase_rc) {
 
     for (unsigned ksize = 1; ksize <= 16; ksize += 2) {   // loop over all possible k-sizes (canonical)
 
@@ -389,7 +389,7 @@ TEST(kmerencoder_test, enencoder32_1kbase_rc) {
     }
 }
 
-TEST(kmerencoder_test, enencoder64_1kbase_rc) {
+TEST(kmerencoder_test, encoder64_1kbase_rc) {
 
     for (unsigned ksize = 1; ksize <= encoder64::max_ksize; ksize += 2) {   // loop over all possible k-sizes (canonical)
 

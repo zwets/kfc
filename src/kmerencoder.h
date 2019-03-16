@@ -96,8 +96,6 @@ kmer_encoder<kmer_t>::kmer_encoder(unsigned ksize, bool sstrand)
       max_kmer_((((kmer_t)1)<<(2*ksize-(sstrand?0:1)))-1),
       encode_(0), decode_(0)
 {
-    std::cerr << "ksize " << ksize_ << "; max_kmer " << max_kmer_ << std::endl;
-
     if (ksize < 1)
         raise_error("invalid k-mer size: %d", ksize);
 

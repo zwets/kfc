@@ -243,7 +243,7 @@ ds_encode_one(const char *p0)
         }
 
         kmer <<= 1;
-        kmer |= bmid;
+        kmer |= (bmid & 1);
 
         while (q-- != p0) {
             kmer <<= 2;
@@ -278,18 +278,18 @@ ds_encode(const char *p0, const char *p1, kmer_t *t)
     static_assert(ksize & 1,
             "template argument ksize must be odd");
 
-#if 1
+#if 0
     // IMPLEMENTATION 1: use ss_encode, then ss_to_ds
     ss_encode<kmer_t,ksize>(p0, p1, t);
 
     for (kmer_t *pt = t; pt != t + (p1 - ksize + 1 - p0); ++pt)
         *pt = ss_to_ds<kmer_t,ksize>(*pt);
-#elif 0
+#else
     // IMPLEMENTATION 2: use encode_kmer_ds in turn
     const char *p = p0;
-    while (p != p1 - ksize)
+    while (p != p1 - ksize + 1)
         *t++ = ds_encode_one<kmer_t,ksize>(p++);
-#else
+// #else
     // IMPLEMENTATION 3: write rolling encode
 #endif
 }

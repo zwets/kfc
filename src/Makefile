@@ -1,10 +1,10 @@
 CXXFLAGS += -std=c++14 -O3 -DNDEBUG -Wall -Wextra -pedantic -mtune=native
 
-OBJS = kfc.o seqreader.o utils.o 
+OBJS = kfc.o kmerencoder.o seqreader.o utils.o 
 
 LIBS =
 
-HDRS = kmercounter.h tallyman.h kmercodec.h seqreader.h basecodec.h bitfiddle.h utils.h
+HDRS = kmercounter.h tallyman.h kmerencoder.h kmercodec.h basecodec.h bitfiddle.h seqreader.h utils.h
 
 TARGET = kfc
 

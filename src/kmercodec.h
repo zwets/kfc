@@ -92,6 +92,8 @@ ss_encode(const char *p0, const char *p1, kmer_t *t)
     // p now points at the next base to roll into the kmer
 
     while (p != p1) {
+        // clear bits of the outgoing base if current kmer is good
+        kmer &= signed_shr<kmer_t>(kmer|~high_bit<kmer_t>, bitsize<kmer_t>-2*ksize+1);
         // make place for the new base
         kmer <<= 2;
         // retrieve the new base
@@ -100,8 +102,6 @@ ss_encode(const char *p0, const char *p1, kmer_t *t)
         kmer &= ~flood_hibit<kmer_t>(new_base);
         // or in the new base or invalid value with ksize high bits
         kmer |= new_base;
-        // clear bits above the leftmost base if current kmer is good
-        kmer &= signed_shr<kmer_t>(kmer|~high_bit<kmer_t>, bitsize<kmer_t>-2*ksize-1);
         // write it
         *t++ = kmer;
     }

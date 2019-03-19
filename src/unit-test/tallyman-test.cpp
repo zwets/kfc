@@ -40,31 +40,38 @@ typedef std::unique_ptr<tman32dd> uptr32dd;
 typedef tallyman_vec<std::uint32_t,std::uint32_t> tvec3232;
 typedef tallyman_vec<std::uint64_t,std::uint32_t> tvec6432;
 typedef tallyman_vec<std::uint32_t,std::uint64_t> tvec3264;
+typedef tallyman_vec<std::uint64_t,std::uint64_t> tvec6464;
 
 typedef tallyman_map<std::uint32_t,std::uint32_t> tmap3232;
 typedef tallyman_map<std::uint32_t,std::uint64_t> tmap3264;
 typedef tallyman_map<std::uint64_t,std::uint32_t> tmap6432;
+typedef tallyman_map<std::uint64_t,std::uint64_t> tmap6464;
 
 typedef std::map<std::uint32_t,std::uint32_t> map3232;
+typedef std::map<std::uint64_t,std::uint32_t> map6432;
 
-static uptr3232 create_uptr3232(int nbits, int max_gb = 0) {
-    return uptr3232(tman3232::create(nbits, max_gb));
+static uptr3232 create_uptr3232(int nbits, bool map = false) {
+    return uptr3232(map ? (tman3232*) new tmap3232(nbits) : (tman3232*) new tvec3232(nbits));
 }
 
-static uptr3264 create_uptr3264(int nbits, int max_gb = 0) {
-    return uptr3264(tman3264::create(nbits, max_gb));
+static uptr3264 create_uptr3264(int nbits, bool map = false) {
+    return uptr3264(map ? (tman3264*) new tmap3264(nbits) : (tman3264*) new tvec3264(nbits));
 }
 
-static uptr6432 create_uptr6432(int nbits, int max_gb = 0) {
-    return uptr6432(tman6432::create(nbits, max_gb));
+static uptr6432 create_uptr6432(int nbits, bool map = false) {
+    return uptr6432(map ? (tman6432*) new tmap6432(nbits) : (tman6432*) new tvec6432(nbits));
 }
 
-static uptr32dd create_uptr32dd(int nbits, int max_gb = 0) {
-    return uptr32dd(tman32dd::create(nbits, max_gb));
+static uptr6464 create_uptr6464(int nbits, bool map = false) {
+    return uptr6464(map ? (tman6464*) new tmap6464(nbits) : (tman6464*) new tvec6464(nbits));
+}
+
+static uptr32dd create_uptr32dd(int nbits) {
+    return uptr32dd(new tallyman_vec<std::uint32_t, double>(nbits));
 }
 
 TEST(tallyman_test, no_bits_zero) {
-    EXPECT_DEATH(create_uptr3232(0), ".*");
+    EXPECT_DEATH(new tvec3232(0), ".*");
 }
 
 TEST(tallyman_test, double_counter) {
@@ -74,68 +81,41 @@ TEST(tallyman_test, double_counter) {
 }
 
 TEST(tallyman_test, no_bits_33) {
-    EXPECT_DEATH(tman3232::create(33), ".*");
+    EXPECT_DEATH(new tmap3232(33), ".*");
+    EXPECT_DEATH(new tvec3232(33), ".*");
+    EXPECT_DEATH(new tmap3264(33), ".*");
+    EXPECT_DEATH(new tvec3264(33), ".*");
 }
 
 TEST(tallyman_test, no_bits_65) {
-    EXPECT_DEATH(tman6432::create(65), ".*");
+    EXPECT_DEATH(new tmap6432(65), ".*");
+    EXPECT_DEATH(new tvec6432(65), ".*");
+    EXPECT_DEATH(new tmap6464(65), ".*");
+    EXPECT_DEATH(new tvec6464(65), ".*");
 }
 
-TEST(tallyman_test, no_bits_65_either) {
-    EXPECT_DEATH(tman6464::create(65), ".*");
+TEST(tallyman_test, bits_1_vec) {
+    uptr3232 r1 = create_uptr3232(1);
+    uptr6432 r2 = create_uptr6432(1);
+    uptr3264 r3 = create_uptr3264(1);
+    uptr6464 r4 = create_uptr6464(1);
 }
 
-TEST(tallyman_test, bits_1) {
-    uptr3232 r = create_uptr3232(1);
+TEST(tallyman_test, bits_1_map) {
+    uptr3232 r1 = create_uptr3232(1, true);
+    uptr6432 r2 = create_uptr6432(1, true);
+    uptr3264 r3 = create_uptr3264(1, true);
+    uptr6464 r4 = create_uptr6464(1, true);
 }
 
 TEST(tallyman_test, bits_64) {
-    uptr6432 r = create_uptr6432(64);
+    uptr6432 r1 = create_uptr6432(64);
+    uptr6464 r2 = create_uptr6464(64);
 }
 
-TEST(tallyman_test, bits_1_is_vec) {
-    uptr3232 r = create_uptr3232(1);
-    tman3232 *p = dynamic_cast<tvec3232*>(r.get());
-    EXPECT_NE(p, (tman3232*)0);
-}
-
-TEST(tallyman_test, bits_64_is_map) {
-    uptr6432 r = create_uptr6432(64);
-    tman6432 *p = dynamic_cast<tmap6432*>(r.get());
-    EXPECT_NE(p, (tman6432*)0);
-}
-
-TEST(tallyman_test, bits_32_map) {
-    uptr3232 r = create_uptr3232(32,1);
-    tman3232 *p = dynamic_cast<tmap3232*>(r.get());
-    EXPECT_NE(p, (tman3232*)0);
-}
-
-TEST(tallyman_test, bits_33_map) {
-    uptr6432 r = create_uptr6432(33,1);
-    tman6432 *p = dynamic_cast<tmap6432*>(r.get());
-    EXPECT_NE(p, (tman6432*)0);
-}
-
-TEST(tallyman_test, bits_27_1g_vec) {
-    uptr3232 r = create_uptr3232(27,1);
-    tman3232 *p = dynamic_cast<tvec3232*>(r.get());
-    EXPECT_NE(p, (tman3232*)0);
-}
-
-TEST(tallyman_test, bits_28_1g_depends) {
-    uptr3232 r0 = create_uptr3232(28,1);
-    tman3232 *p0 = dynamic_cast<tvec3232*>(r0.get());
-    EXPECT_NE(p0, (tman3232*)0);
-    uptr3264 r1 = create_uptr3264(28,1);
-    tman3264 *p1 = dynamic_cast<tmap3264*>(r1.get());
-    EXPECT_NE(p1, (tman3264*)0);
-}
-
-TEST(tallyman_test, bits_29_1g_map) {
-    uptr3232 r = create_uptr3232(29,1);
-    tman3232 *p = dynamic_cast<tmap3232*>(r.get());
-    EXPECT_NE(p, (tman3232*)0);
+TEST(tallyman_test, bits_64_map) {
+    uptr6432 r1 = create_uptr6432(64,true);
+    uptr6464 r2 = create_uptr6464(64,true);
 }
 
 TEST(tallyman_test, store_none) {
@@ -146,15 +126,15 @@ TEST(tallyman_test, store_none) {
 }
 
 TEST(tallyman_test, store_one) {
-    uptr3232 r = create_uptr3232(2);
+    uptr3264 r = create_uptr3264(2);
     r->tally({1});
     EXPECT_TRUE(r->is_vec());
-    const uint32_t* v = r->get_results_vec();
+    const uint64_t* v = r->get_results_vec();
     EXPECT_EQ(v[1], 1);
 }
 
 TEST(tallyman_test, store_two_ones) {
-    uptr3232 r = create_uptr3232(2);
+    uptr6432 r = create_uptr6432(2);
     r->tally({1,1});
     EXPECT_TRUE(r->is_vec());
     const uint32_t* v = r->get_results_vec();
@@ -170,15 +150,24 @@ TEST(tallyman_test, store_invalid) {
     EXPECT_EQ(v[3], 1);
 }
 
+TEST(tallyman_test, store_invalid_64) {
+    uptr6432 r = create_uptr6432(2);
+    r->tally({4,3});
+    EXPECT_EQ(r->invalid_count(),1);
+    EXPECT_TRUE(r->is_vec());
+    const uint32_t* v = r->get_results_vec();
+    EXPECT_EQ(v[3], 1);
+}
+
 TEST(tallyman_test, store_map_none) {
-    uptr3232 r = create_uptr3232(29,1);
+    uptr3232 r = create_uptr3232(29,true);
     EXPECT_TRUE(r->is_map());
     const map3232& m = r->get_results_map();
     EXPECT_EQ(m.begin(),m.end());
 }
 
 TEST(tallyman_test, store_map_one) {
-    uptr3232 r = create_uptr3232(29,1);
+    uptr3232 r = create_uptr3232(29,true);
     r->tally({1234567});
     EXPECT_TRUE(r->is_map());
     const map3232& m = r->get_results_map();
@@ -189,7 +178,7 @@ TEST(tallyman_test, store_map_one) {
 }
 
 TEST(tallyman_test, store_map_two_ones) {
-    uptr3232 r = create_uptr3232(29,1);
+    uptr3232 r = create_uptr3232(29,true);
     r->tally({7654321,7654321});
     EXPECT_TRUE(r->is_map());
     const map3232& m = r->get_results_map();
@@ -200,13 +189,25 @@ TEST(tallyman_test, store_map_two_ones) {
 }
 
 TEST(tallyman_test, store_map_invalid) {
-    uptr3232 r = create_uptr3232(29,1);
+    uptr3232 r = create_uptr3232(29,true);
     r->tally({std::uint32_t(1)<<29,(std::uint32_t(1)<<29)-1});
     EXPECT_EQ(r->invalid_count(),1);
     EXPECT_TRUE(r->is_map());
     const map3232& m = r->get_results_map();
     map3232::const_iterator i = m.cbegin();
     EXPECT_EQ(i->first, (std::uint32_t(1)<<29)-1);
+    EXPECT_EQ(i->second, 1);
+    EXPECT_EQ(++i, m.cend());
+}
+
+TEST(tallyman_test, store_map_invalid_64) {
+    uptr6432 r = create_uptr6432(29,true);
+    r->tally({std::uint64_t(1)<<29,(std::uint64_t(1)<<29)-1});
+    EXPECT_EQ(r->invalid_count(),1);
+    EXPECT_TRUE(r->is_map());
+    const map6432& m = r->get_results_map();
+    map6432::const_iterator i = m.cbegin();
+    EXPECT_EQ(i->first, (std::uint64_t(1)<<29)-1);
     EXPECT_EQ(i->second, 1);
     EXPECT_EQ(++i, m.cend());
 }

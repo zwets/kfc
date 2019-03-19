@@ -28,11 +28,6 @@
 namespace kfc {
 
 
-// Forward declarations
-class kmer_counter;
-template <typename kmer_t, typename count_t> class kmer_counter_tally;
-
-
 // output_opts - bit field flag for kmer_counter<>::write_results()
 //
 enum output_opts : unsigned {
@@ -46,23 +41,24 @@ enum output_opts : unsigned {
 
 // kmer_counter
 //
-// Perform any number of calls to process(seq), then invoke write_results()
-// to output the detected kmers and their counts.
+// Counts distinct kmers in any number of sequences of DNA.  Writes the counts
+// as a table, sorted alphabetically on k-mer, to an output stream.  Its two
+// core methods are process(sequence) and write_results().
 //
 // This class has three implementations: two based on tallying the kmers as
 // they are processed, of which one uses a vector of tallies and one uses a
 // map of kmer to tally, and one which does not tally but collects the list
 // of kmers as is, then sorts this when results are requested.
 //
-// The count_t parameter determines the size of the counts that can be kept,
-// and has memory impact: factor 2 with k-space for the vector implementation,
-// factor 2 with k-count for the map, none for the list.
+// The count_t template parameter determines the size of the counts that can
+// be kept, and has memory impact: factor 2 with k-space for the vector
+// implementation, factor 2 with k-count for the map, none for the list.
 //
-// The kmer_t parameter has impact factor 2 with k-count for both map and list,
-// none for vector.  When k-size > 15, then it must be 64-bit (as each base in
-// a k-mer takes up two bits and we reserve one for reporting invalid k-mers.
-// When k-size is 15 or below, then picking std::uint32_fast_t may give 64-bit
-// but could be faster than std::uint32_t which is guaranteed to be 32-bit.
+// The kmer_t template parameter has impact factor 2 with k-count for both map
+// and list, none for vector.  When k-size > 15, then it must be 64-bit (as
+// each base in a k-mer takes up two bits and we reserve one for reporting
+// invalid k-mers).  When k-size is 15 or below, std::uint32_t seems to be the
+// more optimal choice than std::uint32_fast_t (which may be 64-bit).
 //
 // The tallyman component in the implementation classes encapsulates further
 // optimisations for speed and memory consumption; see tallyman.h for details.
@@ -79,9 +75,6 @@ class kmer_counter
         unsigned n_threads_;
 
     public:
-        static kmer_counter* create(int ksize, bool s_strand = false, unsigned min_mcap = 0, unsigned max_gb = 0, bool k32_bit = false, unsigned n_threads = 0);
-
-    public:
         kmer_counter(int ksize, bool s_strand, unsigned n_threads);
         virtual ~kmer_counter() { }
 
@@ -96,8 +89,9 @@ class kmer_counter
 
 // kmer_counter_tally ----------------------------------------------------------
 //
-// Implements kmer_counter for a given kmer_t.  You can instantiate this class
-// directly if you know your ksize ahead of time that ksize will not exceed kmer_encoder<kmer_t>::max_ksize.
+// Implements kmer_counter by keeping a tally for every kmer.  The tally counter
+// has two possible implementations: a vector with an entry for every possible
+// value of kmer_t, or a map whose keys are k-mers and values are counts.
 
 template <typename kmer_t, typename count_t>
 class kmer_counter_tally : public kmer_counter
@@ -111,11 +105,11 @@ class kmer_counter_tally : public kmer_counter
         constexpr static int max_ksize = kmer_encoder<kmer_t>::max_ksize;
 
     private:
-        std::unique_ptr<tallyman<kmer_t,count_t> > tallyman_;
+        std::unique_ptr<tallyman<kmer_t,count_t>> tallyman_;
         kmer_encoder<kmer_t> encoder_;
 
     public:
-	kmer_counter_tally(int ksize, bool s_strand, unsigned mem_gb, unsigned n_threads);
+	kmer_counter_tally(tallyman<kmer_t,count_t>*, int ksize, bool s_strand, unsigned n_threads);
         kmer_counter_tally(const kmer_counter_tally<kmer_t,count_t>&) = delete;
         kmer_counter_tally& operator=(const kmer_counter_tally<kmer_t,count_t>&) = delete;
         virtual ~kmer_counter_tally() { }
@@ -134,7 +128,7 @@ class kmer_counter_tally : public kmer_counter
 //
 // This implementation does not keep tallies but instead keeps the list of kmers
 // as they are coming in.  When write_results is called, the list is sorted and
-// counted kmers are output.
+// the counted kmers are output.
 
 template <typename kmer_t>
 class kmer_counter_list : public kmer_counter
@@ -150,52 +144,15 @@ class kmer_counter_list : public kmer_counter
         kmer_encoder<kmer_t> encoder_;
 
     public:
-	kmer_counter_list(int ksize, bool s_strand, unsigned min_mcap, unsigned max_gb, unsigned n_threads);
+	kmer_counter_list(int ksize, bool s_strand, size_t max_count, unsigned n_threads);
         kmer_counter_list(const kmer_counter_list<kmer_t>&) = delete;
         kmer_counter_list& operator=(const kmer_counter_list<kmer_t>&) = delete;
-        virtual ~kmer_counter_list() { if (kmers_) free(kmers_); }
+        virtual ~kmer_counter_list();
 
         virtual void process(const std::string& data);
         virtual void process(std::string &&data);
         virtual std::ostream& write_results(std::ostream& os, unsigned = output_opts::none) const;
 };
-
-// kmer_counter factory  --------------------------------------------------------
-
-// The create factory method attempts to return the optimal (fastest) implementation
-// but YMMV in practice.  This is what it currently does:
-// - If k-size is small (up to 13): vector implementation
-// - Else if it is up to 15: list implementation with kmer_t 32-bit, except see below
-// - If it is up to 31: same but with kmer_t 64-but, except see below
-// - The EXCEPT is that if N (total number of kmers counted) would exceed available memory
-//   then it SHOULD (but does not currently) use map implementation
-//   The issue being that it can't know that ahead of time.
-//
-kmer_counter* kmer_counter::create(int ksize, bool s_strand, unsigned min_mcap, unsigned max_gb, bool k32_bit, unsigned n_threads)
-{
-    typedef typename std::uint32_t tally_count_t;
-
-    kmer_counter *ret = 0;
-
-    if (ksize < 1)
-        raise_error("invalid k-mer size: %d", ksize);
-    else if (ksize <= 13)
-        if (k32_bit)
-            ret = new kmer_counter_tally<std::uint32_t,tally_count_t>(ksize, s_strand, max_gb, n_threads);
-        else
-            ret = new kmer_counter_tally<std::uint_fast32_t,tally_count_t>(ksize, s_strand, max_gb, n_threads);
-    else if (ksize <= kmer_counter_list<std::uint32_t>::max_ksize)
-        if (k32_bit)
-            ret = new kmer_counter_list<std::uint32_t>(ksize, s_strand, min_mcap, max_gb, n_threads);
-        else
-            ret = new kmer_counter_list<std::uint_fast32_t>(ksize, s_strand, min_mcap, max_gb, n_threads);
-    else if (ksize <= kmer_counter_list<std::uint64_t>::max_ksize)
-        ret = new kmer_counter_list<std::uint64_t>(ksize, s_strand, min_mcap, max_gb, n_threads);
-    else
-        raise_error("k-mer size %d is not supported, maximum is %d", ksize, kmer_counter_list<std::uint64_t>::max_ksize);
-
-    return ret;
-}
 
 // kmer_counter methods -------------------------------------------------------
 
@@ -209,9 +166,10 @@ kmer_counter::kmer_counter(int ksize, bool s_strand, unsigned n_threads)
 // kmer_counter_tally methods --------------------------------------------------
 
 template <typename kmer_t,typename count_t>
-kmer_counter_tally<kmer_t,count_t>::kmer_counter_tally(int ksize, bool s_strand, unsigned mem_gb, unsigned n_threads)
+kmer_counter_tally<kmer_t,count_t>::kmer_counter_tally(
+        tallyman<kmer_t,count_t>* tman, int ksize, bool s_strand, unsigned n_threads)
     : kmer_counter(ksize, s_strand, n_threads),
-      tallyman_(tallyman<kmer_t,count_t>::create(2*ksize-(s_strand?0:1), mem_gb)),
+      tallyman_(tman),
       encoder_(ksize, s_strand)
 {
     if (ksize > max_ksize)
@@ -347,7 +305,7 @@ kmer_counter_tally<kmer_t, count_t>::write_map_results(std::ostream &os, bool dn
 // kmer_counter_list methods --------------------------------------------------
 
 template <typename kmer_t>
-kmer_counter_list<kmer_t>::kmer_counter_list(int ksize, bool s_strand, unsigned min_mcap, unsigned max_gb, unsigned n_threads)
+kmer_counter_list<kmer_t>::kmer_counter_list(int ksize, bool s_strand, size_t max_count, unsigned n_threads)
     : kmer_counter(ksize, s_strand, n_threads),
       kmers_(0), pkmers_cur_(0), pkmers_end_(0),
       encoder_(ksize, s_strand)
@@ -355,33 +313,24 @@ kmer_counter_list<kmer_t>::kmer_counter_list(int ksize, bool s_strand, unsigned 
     if (ksize > max_ksize)
         raise_error("k-mer size %d too large for this impl (max %d)", ksize, max_ksize);
 
-    size_t max_mb = static_cast<size_t>(max_gb) << 10;
-    verbose_emit("max_mb = %lu", static_cast<unsigned long>(max_mb));
+    //kmers_ = (kmer_t*) malloc(max_count * sizeof(kmer_t));
+    kmers_ = ::new kmer_t[max_count];
 
-    if (max_mb == 0) {
-        size_t phy_mb = get_system_memory() >> 20;
-        max_mb = phy_mb > 2048 ? phy_mb - 2048 : phy_mb;
-        verbose_emit("defaulting max memory to all%s physical memory: %uG",
-                phy_mb > 2048 ? " but 2G" : "", static_cast<unsigned>(max_mb >> 10));
-    }
-
-    size_t alloc_size = max_mb << 20;
-    size_t max_kmers = alloc_size / sizeof(kmer_t);
-
-    verbose_emit("maximum capacity: %uM kmers", static_cast<unsigned>(max_kmers >> 20));
-
-    if (static_cast<size_t>(min_mcap) << 20 > max_kmers)
-        raise_error("insufficient memory (%uG) for %uM k-mers, maximum is %uM", 
-                static_cast<unsigned>(max_mb >> 10), min_mcap, static_cast<unsigned>(max_kmers >> 20));
-
-    kmers_ = (kmer_t*) std::malloc(alloc_size);
     if (kmers_) {
         pkmers_cur_ = kmers_;
-        pkmers_end_ = kmers_ + max_kmers;
+        pkmers_end_ = kmers_ + max_count;
     }
     else
         raise_error("failed to allocate memory (%uMB) for k-mer list",
-                static_cast<unsigned>(alloc_size >> 20));
+                static_cast<unsigned>((max_count * sizeof(kmer_t)) >> 20));
+}
+
+template <typename kmer_t>
+kmer_counter_list<kmer_t>::~kmer_counter_list()
+{ 
+    if (kmers_) 
+    //    free (kmers_);
+        delete [] kmers_;
 }
 
 template <typename kmer_t>

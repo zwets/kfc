@@ -20,7 +20,7 @@
 #include <iostream>
 #include <string>
 
-#include "kmercounter.h"
+#include "implpicker.h"
 #include "seqreader.h"
 #include "utils.h"
 
@@ -37,17 +37,18 @@ static const char USAGE[] = "\n"
 "  OPTIONS\n"
 "   -k KSIZE  k-mer size (default %d), must be odd unless option -s is present\n"
 "   -s        consider input to be single stranded, do not canonicalise k-mers\n"
-"   -n        output k-mers as bit-encoded numbers only, no DNA sequence output\n"
-"   -z        include k-mers with a zero count in the output (default omitted)\n"
-"   -i        include the invalid k-mer count in the output (default stderr)\n"
-"   -q        suppress output headers\n"
-"   -l MAX    constrain capacity to around MAX million bases/kmers total\n"
-"   -m MEM    constrain memory use to about MEM GB (default: all minus 2GB)\n"
-"   -x        force k-mers in 32-bits (you normally won't need this option)\n"
+"   -z        include k-mers with a zero count in the output (default: omit)\n"
+"   -i        include the invalid k-mer count in the output (default: stderr)\n"
+"   -n        output k-mers as encoded numbers only, no DNA sequences\n"
+"   -q        suppress output headers, just show k-mers and counts\n"
+"   -l MBASE  limit counting capacity to MBASE million bases (optimises speed)\n"
+"   -m MEMGB  constrain memory use to about MEM GB (default: all minus 2GB)\n"
+"   -x l|v|m  override the implementation choice to be list, vector, or map\n"
 "   -v        produce verbose output to stderr\n"
 "\n"
-"  Each FILE can be an (optionally gzipped) FASTA, FASTQ, or plain DNA file.\n"
-"  If FILE is omitted or '-', it is read from stdin\n"
+"  Each FILE can be an (optionally gzipped) FASTA, FASTQ, or plain DNA file.  If\n"
+"  FILE is omitted or '-', input is read from stdin.  With gzipped input, note\n"
+"  that 'gunzip | kfc' is often fastest (due to multiprocessing).\n"
 "\n"
 "  Only k-mers consisting of proper bases (acgtACGT) are counted.  All k-mers\n"
 "  containing other letters are counted as invalid.\n"
@@ -59,10 +60,15 @@ static const char USAGE[] = "\n"
 "  If option -s is present, then k-mers are output as they occur in the input,\n"
 "  reverse complements are counted separately, and KSIZE may be odd or even.\n"
 "\n"
+"  Use option -l for speed gains by telling kfc how much input to expect (in\n"
+"  millions of bases).  E.g. for a bacterial assembly, '-l 10' will usually\n"
+"  suffice, whereas for human use '-l 3200'.\n"
+"\n"
 "  The output has three columns: k-mer dna sequence, k-mer number, count.  The\n"
 "  DNA column can be suppressed with option -n.  K-mers with a 0 count are not\n"
 "  output unless option -z is present.  Option -i includes the invalid k-mer\n"
-"  count in the output (by default printed to standard error)\n"
+"  count in the output (with DNA sequence \"XXX..\").  By default the invalid\n"
+"  count is printed to standard error).\n"
 "\n"
 "  More information: http://io.zwets.it/kfc.\n"
 "\n";
@@ -79,9 +85,9 @@ int main (int, char *argv[])
 {
     int ksize = DEFAULT_KSIZE;
     bool single_strand = false;
-    int max_mem = 0;
-    int min_mcap = 0;
-    int kmer_32b = false;
+    unsigned max_mbp = 0.0;
+    unsigned max_gb = 0;
+    char force_impl = '\0';
     int n_threads = 0;
     unsigned o_opts = output_opts::none;
 
@@ -103,9 +109,6 @@ int main (int, char *argv[])
         else if (opt == 's') {
             single_strand = true;
         }
-        else if (opt == 'x') {
-            kmer_32b = true;
-        }
         else if (opt == 'n') {
             o_opts |= output_opts::no_dna;
         }
@@ -118,7 +121,8 @@ int main (int, char *argv[])
         else if (opt == 'q') {
             o_opts |= output_opts::no_headers;
         }
-        else if (!*++argv) {    // subsequent options require argument
+        // subsequent options require an argument
+        else if (!*++argv) {
             usage_exit();
         }
         else if (opt == 'k') {
@@ -127,23 +131,26 @@ int main (int, char *argv[])
                 raise_error("invalid k-mer size: %s", *argv);
         }
         else if (opt == 'l') {
-            if ((min_mcap = std::atoi(*argv)) < 1)
-                raise_error("invalid capacity limit: %s", *argv);
+            if ((max_mbp = std::atoi(*argv)) < 1)
+                raise_error("invalid input size: %s", *argv);
         }
         else if (opt == 'm') {
-            if ((max_mem = std::atoi(*argv)) < 1)
+            if ((max_gb = std::atoi(*argv)) < 1)
                 raise_error("invalid memory size: %s", *argv);
+        }
+        else if (opt == 'x') {
+            switch (force_impl = *argv[0]) {
+                case 'l': case 'v': case 'm': break;
+                default: raise_error("invalid implementation: %c", force_impl);
+            }
         }
         else
             usage_exit();
     }
 
-        // Create the kmer_counter
+        // Create the kmer_counter via the pick_implementation method
 
-    // It seems the 32-bit count_t is faster than the fast32
-    //
-    //std::unique_ptr<kmer_counter_F> counter(kmer_counter_F::create(ksize, single_strand, max_mem, kmer_32bit, n_threads));
-    std::unique_ptr<kmer_counter> counter(kmer_counter::create(ksize, single_strand, min_mcap, max_mem, kmer_32b, n_threads));
+    std::unique_ptr<kmer_counter> counter(pick_implementation(ksize, single_strand, max_mbp, max_gb, force_impl, n_threads));
 
         // Iterate over files
 

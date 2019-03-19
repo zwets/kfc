@@ -37,11 +37,6 @@ namespace kfc {
 // - tallyman_vec uses a linear array, with O(1) lookup and C*2^B memory;
 // - tallyman_map uses a map, with O(log N) lookup and O(N) storage
 //
-// The tallyman::create(nbits,max_gb) factory method returns the vector
-// implementation if it fits in max_gb memory, or else the map implementation.
-// This policy may be non-optimal, especially when the number of tallies is
-// not large, as random vector access for a large vector gives low cache hits.
-//
 // The core operation is tally(items), which tallies each i in items by either
 // incrementing its item count, or incrementing the invalid_count if i exceeds
 // max_value, the largest possible nbit number.
@@ -53,7 +48,7 @@ namespace kfc {
 // Template parameter count_t can be any numeric type, though integral types
 // will likely perform better than floating point.  It must be wide enough
 // to hold the maximum tally of any element (and of the invalid count).
-// Roll-over of integral types is silent; this is C++.
+// Roll-over of integral types is silent.
 //
 // The get_results_X() members return the tallied counts.  For performance
 // reasons, these members do not shield from the underlying implementation
@@ -70,9 +65,6 @@ class tallyman {
     protected:
         value_t max_value_;
         count_t n_invalid_;
-
-    public:
-        static tallyman<value_t,count_t>* create(int nbits, int max_gb = 0);
 
     protected:
         tallyman(int nbits);
@@ -149,49 +141,6 @@ class tallyman_map : public tallyman<value_t,count_t>
         virtual const std::map<value_t,count_t>& get_results_map() const { return map_; }
 };
 
-
-// static create -------------------------------------------------------------
-
-template<typename value_t, typename count_t>
-tallyman<value_t,count_t>*
-tallyman<value_t,count_t>::create(int nbits, int max_gb)
-{
-    verbose_emit("tallyman: nbits %d, value_t %d, count_t %d", nbits, 8*sizeof(value_t), 8*sizeof(count_t));
-
-    constexpr int max_bits = 8*sizeof(value_t);
-
-    if (nbits < 1)
-        raise_error("number of bits must be one or more: %d", nbits);
-
-    if (nbits > max_bits)
-        raise_error("%d bits requested exceeds limit %d", nbits, max_bits);
-
-    unsigned long max_mb = static_cast<unsigned long>(max_gb) << 10;
-    unsigned long vec_mb = sizeof(count_t) * (1UL << std::max(0, nbits-20));
-
-    if (max_gb == 0)
-    {
-        unsigned long phy_mb = get_system_memory() >> 20;
-        max_mb = phy_mb > 2048 ? phy_mb - 2048 : phy_mb;
-
-        verbose_emit("defaulting max memory to all%s physical memory: %luG",
-                phy_mb > 2048 ? " but 2G" : "", (max_mb>>10));
-    }
-
-    if (vec_mb > max_mb)
-    {
-        verbose_emit("vector memory (%luG) would exceed %luG: tallying using map",
-                (vec_mb>> 10), (max_mb>>10));
-        return new tallyman_map<value_t,count_t>(nbits);
-    }
-    else
-    {
-        verbose_emit("vector memory (%luG) fits %luG: tallying using linear vector",
-                (vec_mb>>10), (max_mb>>10));
-        return new tallyman_vec<value_t,count_t>(nbits);
-    }
-}
-
 // constructors --------------------------------------------------------------
 
 template<typename value_t, typename count_t>
@@ -199,6 +148,8 @@ tallyman<value_t,count_t>::tallyman(int nbits)
     : max_value_((static_cast<value_t>(1)<<nbits)-1), n_invalid_(0)
 {
     constexpr int max_bits = 8*sizeof(value_t);
+    if (nbits < 1)
+        raise_error("invalid number of bits: %d", nbits);
     if (nbits > max_bits)
         raise_error("number of bits (%d) exceeds maximum %d", nbits, max_bits);
 }

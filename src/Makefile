@@ -4,7 +4,7 @@ OBJS = kfc.o kmerencoder.o seqreader.o utils.o
 
 LIBS =
 
-HDRS = kmercounter.h tallyman.h kmerencoder.h kmercodec.h basecodec.h bitfiddle.h seqreader.h utils.h
+HDRS = implpicker.h kmercounter.h tallyman.h kmerencoder.h kmercodec.h basecodec.h bitfiddle.h seqreader.h utils.h
 
 TARGET = kfc
 

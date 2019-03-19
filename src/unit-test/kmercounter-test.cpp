@@ -27,13 +27,13 @@ namespace {
 typedef kmer_counter_list<std::uint32_t> counter32list; // kmer_t 32
 typedef kmer_counter_list<std::uint64_t> counter64list; // kmer_t 64
 typedef kmer_counter_tally<std::uint32_t,std::uint32_t> counter32tally; // kmer_t 32, count_t 32
-//typedef kmer_counter_tally<std::uint64_t,std::uint32_t> counter64tally; // kmer_t 64, count_t 32
+typedef kmer_counter_tally<std::uint64_t,std::uint32_t> counter64tally; // kmer_t 64, count_t 32
 
 static tallyman<std::uint32_t,std::uint32_t>*
 tman32(int ks, bool ss = false) { return new tallyman_map<std::uint32_t,std::uint32_t>(2*ks-(ss?0:1)); }
 
-//static tallyman<std::uint64_t,std::uint32_t>*
-//tman64(int ks, bool ss = false) { return new tallyman_map<std::uint64_t,std::uint32_t>(2*ks-(ss?0:1)); }
+static tallyman<std::uint64_t,std::uint32_t>*
+tman64(int ks, bool ss = false) { return new tallyman_map<std::uint64_t,std::uint32_t>(2*ks-(ss?0:1)); }
 
 // sizes and limits -----------------------------------------------------
 
@@ -309,10 +309,9 @@ TEST(kmercounter_test, encode_ksize_15_list_ss) {
     ASSERT_EQ(count, 1);
 }
 
-/*
 TEST(kmercounter_test, encode_ksize_15_tally_1gb) {
     char seq[] = "gaatctgcccagcac";
-    counter32tally c(15, false, 1, 0);
+    counter32tally c(tman32(15), 15, false, 0);
     c.process(seq);
 
     std::stringstream ss;
@@ -330,7 +329,7 @@ TEST(kmercounter_test, encode_ksize_15_tally_1gb) {
 
 TEST(kmercounter_test, encode_ksize_15_ss_1gb) {
     char seq[] = "gaatctgcccagcac";
-    counter32tally c(15, true, 1, 0);
+    counter32tally c(tman32(15,true), 15, true, 0);
     c.process(seq);
 
     std::stringstream ss;
@@ -348,7 +347,7 @@ TEST(kmercounter_test, encode_ksize_15_ss_1gb) {
 
 TEST(kmercounter_test, encode_tally_ksize_31) {
     char seq[] = "taagcgtttgctatgccatcccatcgggcca";
-    counter64tally c(31, false, 0, 0);
+    counter64tally c(tman64(31), 31, false, 0);
     c.process(seq);
 
     std::stringstream ss;
@@ -366,7 +365,7 @@ TEST(kmercounter_test, encode_tally_ksize_31) {
 
 TEST(kmercounter_test, encode_list_ksize_31) {
     char seq[] = "taagcgtttgctatgccatcccatcgggcca";
-    counter64list c(31, false, 0, 0, 0);
+    counter64list c(31, false, 100, 0);
     c.process(seq);
 
     std::stringstream ss;
@@ -384,7 +383,7 @@ TEST(kmercounter_test, encode_list_ksize_31) {
 
 TEST(kmercounter_test, encode_tally_ksize_31_ss) {
     char seq[] = "taagcgtttgctatgccatcccatcgggcca";
-    counter64tally c(31, true, 0, 0);
+    counter64tally c(tman64(31,true), 31, true, 0);
     c.process(seq);
 
     std::stringstream ss;
@@ -402,7 +401,7 @@ TEST(kmercounter_test, encode_tally_ksize_31_ss) {
 
 TEST(kmercounter_test, encode_list_ksize_31_ss) {
     char seq[] = "taagcgtttgctatgccatcccatcgggcca";
-    counter64list c(31, true, 0, 0, 0);
+    counter64list c(31, true, 100, 0);
     c.process(seq);
 
     std::stringstream ss;
@@ -445,8 +444,8 @@ static const char rc_dna[KBASE+1] =
 
 TEST(kmercounter_test, counter32_1kbase_crosscheck_rc) {
 
-    counter32tally c1(15, false, 1, 0);
-    counter32list c2(15, false, 0, 1, 0);
+    counter32tally c1(tman32(15), 15, false, 0);
+    counter32list c2(15, false, sizeof(dna), 0);
 
     c1.process(dna);
     c2.process(rc_dna);
@@ -462,8 +461,8 @@ TEST(kmercounter_test, counter32_1kbase_crosscheck_rc) {
 
 TEST(kmercounter_test, counter64_1kbase_crosscheck_rc) {
 
-    counter64tally c1(31, false, 1, 0);
-    counter64list c2(31, false, 0, 1, 0);
+    counter64tally c1(tman64(31), 31, false, 0);
+    counter64list c2(31, false, sizeof(dna), 0);
 
     c1.process(dna);
     c2.process(rc_dna);
@@ -479,8 +478,8 @@ TEST(kmercounter_test, counter64_1kbase_crosscheck_rc) {
 
 TEST(kmercounter_test, counter32_1kbase_crosscheck_ss) {
 
-    counter32tally c1(15, true, 1, 0);
-    counter32list c2(15, true, 0, 1, 0);
+    counter32tally c1(tman32(15,true), 15, true, 0);
+    counter32list c2(15, true, sizeof(dna), 0);
 
     c1.process(dna);
     c2.process(dna);
@@ -496,8 +495,8 @@ TEST(kmercounter_test, counter32_1kbase_crosscheck_ss) {
 
 TEST(kmercounter_test, counter64_1kbase_crosscheck_ss) {
 
-    counter64tally c1(31, true, 1, 0);
-    counter64list c2(31, true, 0, 1, 0);
+    counter64tally c1(tman64(31,true), 31, true, 0);
+    counter64list c2(31, true, sizeof(dna), 0);
 
     c1.process(dna);
     c2.process(dna);
@@ -510,7 +509,6 @@ TEST(kmercounter_test, counter64_1kbase_crosscheck_ss) {
 
     ASSERT_EQ(ss1.str(), ss2.str());
 }
-*/
 
 } // namespace
   // vim: sts=4:sw=4:ai:si:et

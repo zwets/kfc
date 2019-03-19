@@ -150,7 +150,7 @@ int main (int, char *argv[])
 
         // Create the kmer_counter via the pick_implementation method
 
-    std::unique_ptr<kmer_counter> counter(pick_implementation(ksize, single_strand, max_mbp, max_gb, force_impl, n_threads));
+    std::unique_ptr<kmer_counter> counter(pick_implementation(ksize, single_strand, max_mbp, max_gb, force_impl));
 
         // Iterate over files
 

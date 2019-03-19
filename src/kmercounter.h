@@ -72,10 +72,9 @@ class kmer_counter
     protected:
         int ksize_;
         bool s_strand_;
-        unsigned n_threads_;
 
     public:
-        kmer_counter(int ksize, bool s_strand, unsigned n_threads);
+        kmer_counter(int ksize, bool s_strand);
         virtual ~kmer_counter() { }
 
         int ksize() const { return ksize_; }
@@ -109,7 +108,7 @@ class kmer_counter_tally : public kmer_counter
         kmer_encoder<kmer_t> encoder_;
 
     public:
-	kmer_counter_tally(tallyman<kmer_t,count_t>*, int ksize, bool s_strand, unsigned n_threads);
+	kmer_counter_tally(tallyman<kmer_t,count_t>*, int ksize, bool s_strand);
         kmer_counter_tally(const kmer_counter_tally<kmer_t,count_t>&) = delete;
         kmer_counter_tally& operator=(const kmer_counter_tally<kmer_t,count_t>&) = delete;
         virtual ~kmer_counter_tally() { }
@@ -144,7 +143,7 @@ class kmer_counter_list : public kmer_counter
         kmer_encoder<kmer_t> encoder_;
 
     public:
-	kmer_counter_list(int ksize, bool s_strand, size_t max_count, unsigned n_threads);
+	kmer_counter_list(int ksize, bool s_strand, size_t max_count);
         kmer_counter_list(const kmer_counter_list<kmer_t>&) = delete;
         kmer_counter_list& operator=(const kmer_counter_list<kmer_t>&) = delete;
         virtual ~kmer_counter_list();
@@ -158,8 +157,8 @@ class kmer_counter_list : public kmer_counter
 
 template <typename kmer_t,typename count_t>
 kmer_counter_tally<kmer_t,count_t>::kmer_counter_tally(
-        tallyman<kmer_t,count_t>* tman, int ksize, bool s_strand, unsigned n_threads)
-    : kmer_counter(ksize, s_strand, n_threads),
+        tallyman<kmer_t,count_t>* tman, int ksize, bool s_strand)
+    : kmer_counter(ksize, s_strand),
       tallyman_(tman),
       encoder_(ksize, s_strand)
 {
@@ -296,8 +295,8 @@ kmer_counter_tally<kmer_t, count_t>::write_map_results(std::ostream &os, bool dn
 // kmer_counter_list methods --------------------------------------------------
 
 template <typename kmer_t>
-kmer_counter_list<kmer_t>::kmer_counter_list(int ksize, bool s_strand, size_t max_count, unsigned n_threads)
-    : kmer_counter(ksize, s_strand, n_threads),
+kmer_counter_list<kmer_t>::kmer_counter_list(int ksize, bool s_strand, size_t max_count)
+    : kmer_counter(ksize, s_strand),
       kmers_(0), pkmers_cur_(0), pkmers_end_(0),
       encoder_(ksize, s_strand)
 {

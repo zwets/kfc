@@ -1,5 +1,5 @@
 /* implpicker-test.cpp
- * 
+ *
  * Copyright (C) 2018  Marco van Zwetselaar <io@zwets.it>
  *
  * This program is free software: you can redistribute it and/or modify
@@ -28,9 +28,9 @@ typedef std::uint32_t u32;
 typedef std::uint64_t u64;
 
 std::unique_ptr<kmer_counter>
-pick_impl_wrap(int ks, bool ss = false, unsigned mc = 0, unsigned mg = 0, char fi = '\0', unsigned nt = 0)
+pick_impl_wrap(int ks, bool ss = false, unsigned mc = 0, unsigned mg = 0, char fi = '\0')
 {
-    return std::unique_ptr<kmer_counter>(pick_implementation(ks, ss, mc, mg, fi, nt));
+    return std::unique_ptr<kmer_counter>(pick_implementation(ks, ss, mc, mg, fi));
 }
 
 bool is_tally3232(kmer_counter *p) {

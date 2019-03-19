@@ -23,28 +23,11 @@
 namespace kfc {
 
 
-// pick_implementation() - factory method producing "optimal" kmer_counter
-//
-// This method return a kmer_counter instance which is optimal given the set
-// of parameters passed to it.  See implpicker.cpp for the decision logic.
-//
-// The caller gets ownership of the kmer_counter that is returned.
-//
-extern kmer_counter* 
-pick_implementation(
-        int ksize,              // k-mer size
-        bool s_strand,          // single strand encoding
-        unsigned max_mbp,       // maximum number of millions of bases
-        unsigned max_gb,        // maximum memory use in GB 
-        char force_impl,        // force vector, list, map implementation 
-        unsigned n_threads);    // number of threads
-
-
 // pick_implementation() - factory method producing optimal kmer_counter
 //
 // This unit defines pick_implementation(), a factory method that produces
 // an instance of kmer_counter which is optimal given a set of parameters
-// and constraints.
+// and constraints.  The caller gets ownership of the kmer_counter.
 //
 // Implementations: Vector, Map, List
 //
@@ -113,14 +96,13 @@ pick_implementation(
 // In the map and list implementations, K has no independent effect other than
 // the memory doubling at K>15.  For both, memory consumption is linear with C.
 // For the list implementation is it exactly 4C resp. 8C (at K<=15 resp. K>15).
-// At human genome scale this means ~12-24GB.  The map implementation has a
-// likely overhead per C of 24, making total size 32C to 40C, depending on the
-// sizes of count_t and kmer_t.
+// At human genome scale this means ~12-24GB.  The map implementation has an
+// overhead per C between 8 and 16.
 //
 // Limits: M, L, given K and S
 //
 // The user-settable memory limit M (specified in GB, below we convert to MB)
-// and count limit L (specified in M kmers, below we use log2) impose the 
+// and count limit L (specified in M kmers, below we use log2) impose the
 // following constraints.  Given K (range 1..31) and S (range 0..1):
 //
 // - if L > 4096 then count_t must be 64-bits
@@ -132,13 +114,10 @@ pick_implementation(
 // * list: factor 4 on L, possible 2 on K, but cost of sorting
 //   - K <=15: mem(C) = 4*C = 2^(2+L)
 //   - K > 15: mem(C) = 8*C = 2^(3+L)
-// * map: factor 32-40 on L, marginal to K
-//   - K <=15, L < 32: mem(C) = 2^(5+L)      = 2^(5+L)
-//   - K <=15, L >=32: mem(C) = 2^(5+L) + 4L = 2^(5+L) + 2^(2+L)
-//   - K > 15, L < 32: mem(C) = 2^(5+L) + 4L = 2^(5+L) + 2^(2+L)
-//   - K > 15, L >=32: mem(C) = 2^(5+L) + 8L = 2^(5+L) + 2^(3+L)
+// * map: factor 8-24 on L, marginal to K
+//   - see output of map_entry_size for actual figures
 //
-// --- FOOTNOTES 
+// --- FOOTNOTES
 //
 // [1] Another conceivable implementation would be one which does not encode
 //     the k-mers, but keeps the full input as-is as one or more strings, then
@@ -148,45 +127,52 @@ pick_implementation(
 // [3] A special case would be binary counting: yes/no presence of each k-mer.
 //     This could happen in a bit-vector.
 //
+// ----------------------------------------------------------------------------
 
+
+// make_instance - helper to produce the actual implementation
+//
 static kmer_counter*
-make_instance(char impl, bool big_kmer, bool big_count, int ks, bool ss, size_t nk, unsigned nt)
+make_instance(char impl, bool big_kmer, bool big_count, int ks, bool ss, size_t nk)
 {
     typedef std::uint32_t u32;
     typedef std::uint64_t u64;
 
     size_t kb = 2*ks-(ss?0:1);
 
-    verbose_emit("kmer_counter instance: impl %c, ksize %d, kbits %lu, max_count %lu, kmer_t %d, count_t %d, nt %u", 
-            impl, ks, kb, nk, big_kmer?64:32, big_count?64:32, nt) ;
+    verbose_emit("kmer_counter instance: impl %c, ksize %d, kbits %lu, max_count %lu, kmer_t %d, count_t %d",
+            impl, ks, kb, nk, big_kmer?64:32, big_count?64:32) ;
 
     switch (impl) {
         case 'v':
-            return big_kmer 
-                ? big_count 
-                    ? (kmer_counter*) new kmer_counter_tally<u64,u64>(new tallyman_vec<u64,u64>(kb), ks, ss, nt)
-                    : (kmer_counter*) new kmer_counter_tally<u64,u32>(new tallyman_vec<u64,u32>(kb), ks, ss, nt)
+            return big_kmer
+                ? big_count
+                    ? (kmer_counter*) new kmer_counter_tally<u64,u64>(new tallyman_vec<u64,u64>(kb), ks, ss)
+                    : (kmer_counter*) new kmer_counter_tally<u64,u32>(new tallyman_vec<u64,u32>(kb), ks, ss)
                 : big_count
-                    ? (kmer_counter*) new kmer_counter_tally<u32,u64>(new tallyman_vec<u32,u64>(kb), ks, ss, nt)
-                    : (kmer_counter*) new kmer_counter_tally<u32,u32>(new tallyman_vec<u32,u32>(kb), ks, ss, nt);
+                    ? (kmer_counter*) new kmer_counter_tally<u32,u64>(new tallyman_vec<u32,u64>(kb), ks, ss)
+                    : (kmer_counter*) new kmer_counter_tally<u32,u32>(new tallyman_vec<u32,u32>(kb), ks, ss);
         case 'm':
-            return big_kmer 
-                ? big_count 
-                    ? (kmer_counter*) new kmer_counter_tally<u64,u64>(new tallyman_map<u64,u64>(kb), ks, ss, nt)
-                    : (kmer_counter*) new kmer_counter_tally<u64,u32>(new tallyman_map<u64,u32>(kb), ks, ss, nt)
+            return big_kmer
+                ? big_count
+                    ? (kmer_counter*) new kmer_counter_tally<u64,u64>(new tallyman_map<u64,u64>(kb), ks, ss)
+                    : (kmer_counter*) new kmer_counter_tally<u64,u32>(new tallyman_map<u64,u32>(kb), ks, ss)
                 : big_count
-                    ? (kmer_counter*) new kmer_counter_tally<u32,u64>(new tallyman_map<u32,u64>(kb), ks, ss, nt)
-                    : (kmer_counter*) new kmer_counter_tally<u32,u32>(new tallyman_map<u32,u32>(kb), ks, ss, nt);
+                    ? (kmer_counter*) new kmer_counter_tally<u32,u64>(new tallyman_map<u32,u64>(kb), ks, ss)
+                    : (kmer_counter*) new kmer_counter_tally<u32,u32>(new tallyman_map<u32,u32>(kb), ks, ss);
         case 'l':
-            return big_kmer 
-                    ? (kmer_counter*) new kmer_counter_list<u64>(ks, ss, nk, nt)
-                    : (kmer_counter*) new kmer_counter_list<u32>(ks, ss, nk, nt);
-        default: 
+            return big_kmer
+                    ? (kmer_counter*) new kmer_counter_list<u64>(ks, ss, nk)
+                    : (kmer_counter*) new kmer_counter_list<u32>(ks, ss, nk);
+        default:
             raise_error("invalid implementation option: %c", impl);
             return 0;
     }
 }
 
+
+// map_entry_size - helper computes the memory usage of map implementation
+//
 static size_t
 map_entry_size(bool big_kmer, bool big_count)
 {
@@ -194,14 +180,24 @@ map_entry_size(bool big_kmer, bool big_count)
     typedef std::uint64_t u64;
 
     return big_kmer
-        ? big_count 
+        ? big_count
             ? sizeof(std::map<u64,u64>::value_type) : sizeof(std::map<u64,u32>::value_type)
-        : big_count 
+        : big_count
             ? sizeof(std::map<u32,u64>::value_type) : sizeof(std::map<u32,u32>::value_type);
 }
 
-kmer_counter* 
-pick_implementation(int ksize, bool s_strand, unsigned max_mbp, unsigned max_gb, char force_impl, unsigned n_threads)
+
+// pick_implementation - return "optimal" kmer_counter implementation given parameters
+//
+// See documentation at the top of this header file.
+//
+kmer_counter*
+pick_implementation(
+        int ksize,              // k-mer size
+        bool s_strand,          // single strand encoding
+        unsigned max_mbp,       // maximum number of bases in millions
+        unsigned max_gb,        // maximum memory use in GB
+        char force_impl)        // force vector, list, map implementation: 'v', 'l', 'm'
 {
     bool big_kmer = false;
     bool big_count = false;
@@ -280,7 +276,7 @@ pick_implementation(int ksize, bool s_strand, unsigned max_mbp, unsigned max_gb,
 
             // if user specified max_mbp AND max_gb, then bail out if nothing fits
 
-        if (max_gb && sz_vec > max_mb && sz_map > max_mb && sz_lst > max_mb) 
+        if (max_gb && sz_vec > max_mb && sz_map > max_mb && sz_lst > max_mb)
             raise_error("no implementation can count %uM k-mers in %uGB memory", max_mbp, max_gb);
     }
     else {
@@ -308,31 +304,31 @@ pick_implementation(int ksize, bool s_strand, unsigned max_mbp, unsigned max_gb,
             raise_error("requested map implementation cannot count %luM k-mers in %UGB memory", max_mbp, max_gb);
 
         verbose_emit("user-specified kmer_counter implementation: %c", force_impl);
-        return make_instance(force_impl, big_kmer, big_count, ksize, s_strand, max_count, n_threads);
+        return make_instance(force_impl, big_kmer, big_count, ksize, s_strand, max_count);
     }
 
         // now we can pick the implementation
 
     if (sz_vec <= 512) { // if within half a GB, just go for the vector
         verbose_emit("vector implementation small (%luMB), picking it", sz_vec);
-        return make_instance('v', big_kmer, big_count, ksize, s_strand, max_count, n_threads);
+        return make_instance('v', big_kmer, big_count, ksize, s_strand, max_count);
     }
     else if (sz_lst != 0) { // we know the size the list would have
         if (sz_lst < 512) {
             verbose_emit("list implementation small (%luMB), picking it", sz_lst);
-            return make_instance('l', big_kmer, big_count, ksize, s_strand, max_count, n_threads);
+            return make_instance('l', big_kmer, big_count, ksize, s_strand, max_count);
         }
         else if (sz_vec < sz_lst) {
             verbose_emit("vector implementation (%luMB) smaller than list (%luMB)", sz_vec, sz_lst);
             if (sz_vec > max_mb)
                 emit("expect trashing: insufficient physical memory (%luMB)", max_mb);
-            return make_instance('v', big_kmer, big_count, ksize, s_strand, max_count, n_threads);
+            return make_instance('v', big_kmer, big_count, ksize, s_strand, max_count);
         }
         else {
             verbose_emit("list implementation (%luMB) smaller than vector (%luMB)", sz_lst, sz_vec);
             if (sz_lst > max_mb)
                 emit("expect trashing: insufficient physical memory (%luMB)", max_mb);
-            return make_instance('l', big_kmer, big_count, ksize, s_strand, max_count, n_threads);
+            return make_instance('l', big_kmer, big_count, ksize, s_strand, max_count);
         }
     }
     else { // we don't know the count size
@@ -340,11 +336,11 @@ pick_implementation(int ksize, bool s_strand, unsigned max_mbp, unsigned max_gb,
 
         if (sz_vec < max_mb) { // vec fits but list may be faster, notify user
             verbose_emit("picking vector implementation (%luMB) as it fits memory (%u), and count size is unknown", sz_vec, max_gb);
-            return make_instance('v', big_kmer, big_count, ksize, s_strand, max_count, n_threads);
+            return make_instance('v', big_kmer, big_count, ksize, s_strand, max_count);
         }
         else { // vec impossible, need to choose between map or list, lets take list and hope the best
             verbose_emit("picking list implementation as vector would exceed memory, and count size is unknown");
-            return make_instance('l', big_kmer, big_count, ksize, s_strand, max_count, n_threads);
+            return make_instance('l', big_kmer, big_count, ksize, s_strand, max_count);
         }
     }
 }

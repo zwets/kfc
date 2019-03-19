@@ -22,8 +22,8 @@ namespace kfc {
 
 // The (non-template) kmer_counter constructor
 //
-kmer_counter::kmer_counter(int ksize, bool s_strand, unsigned n_threads)
-    : ksize_(ksize), s_strand_(s_strand), n_threads_(n_threads)
+kmer_counter::kmer_counter(int ksize, bool s_strand)
+    : ksize_(ksize), s_strand_(s_strand)
 {
     if (ksize < 1)
         raise_error("invalid k-mer size: %d", ksize);

@@ -154,15 +154,6 @@ class kmer_counter_list : public kmer_counter
         virtual std::ostream& write_results(std::ostream& os, unsigned = output_opts::none) const;
 };
 
-// kmer_counter methods -------------------------------------------------------
-
-kmer_counter::kmer_counter(int ksize, bool s_strand, unsigned n_threads)
-    : ksize_(ksize), s_strand_(s_strand), n_threads_(n_threads)
-{
-    if (ksize < 1)
-        raise_error("invalid k-mer size: %d", ksize);
-}
-
 // kmer_counter_tally methods --------------------------------------------------
 
 template <typename kmer_t,typename count_t>

@@ -1,6 +1,6 @@
 CXXFLAGS += -std=c++14 -O3 -DNDEBUG -Wall -Wextra -pedantic -mtune=native
 
-OBJS = kfc.o kmerencoder.o seqreader.o utils.o 
+OBJS = kfc.o kmercounter.o kmerencoder.o seqreader.o utils.o 
 
 LIBS =
 

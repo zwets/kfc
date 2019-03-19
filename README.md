@@ -17,8 +17,8 @@ GitHub, here are the steps to run it:
 
   - Built-in support for gzipped files requires Boost Iostreams, available on
   Debian/Ubuntu as the `libboost-iostreams-dev` package.  Note though that
-  until `kfc` is multi-threaded, using the shell's inherent parallelism is
-  naturally more efficient: `gunzip -c file.fa.gz | kfc`.
+  until `kfc` is multi-threaded, using the shell's parallelism is naturally
+  more efficient: `gunzip -c file.fa.gz | kfc`.
 
 
 * Build
@@ -60,31 +60,29 @@ GitHub, here are the steps to run it:
 
 By default, `kfc` treats k-mers and their reverse complement as the same k-mer.
 For instance, if 3-mers `tgc` and `gca` both occur in the input, then they are
-reported as two occurrences of the 3-mer `gca`.
+encoded and reported as two occurrences of the 3-mer `gca`.
 
-This makes sense, as seeing either implies the presence of the other (unless
-we're explicitly dealing with single-stranded DNA):
-
+This makes sense, as (unless we're dealing with single-stranded DNA) seeing
+either implies the presence of the other:
 
     <--cgt---           <--acg---
        |||     is just     |||     from a funny angle
     ---gca-->           ---tgc-->
 
-
 Clearly, `tgc` and `gca` refer to the same base pair sequence, and the choice
-of name (`gca` or `tgc`) is arbitrary.  `kfc` simply picks whichever of the
-two has *a* or *c* as its middle base, and calls the the 'canonical' kmer.
-The requirement that k is odd guarantees that there ís a middle base.
+of name (`gca` or `tgc`) for this pair is arbitrary.  `kfc` picks whichever
+of the two has *a* or *c* as its middle base.  It calls this the 'canonical'
+kmer.  The requirement that k is odd guarantees that there ís a middle base.
 
 If you do not want this 'destranded' behaviour, use option `-s` to treat the
-input as single stranded DNA.  In this mode, only the k-mers which are
-literally seen in the input are reported.  Note that this makes the k-mer
-space twice as large as in the default mode.  In this mode k need not be odd.
+input as single stranded DNA.  In this mode, all k-mers seen 'as-is' in the
+input are reported.  Note that this makes the k-mer space twice as large, and
+the requirement that k be odd is dropped.
 
 
 #### What are k-mer numbers (s-code, c-code)?
 
-`kfc` encodes each k-mer as a integral number.  For the sake of naming things,
+`kfc` encodes each k-mer as an integral number.  For the sake of naming things,
 kfc calls this number an s-code (when in single stranded mode), or c-code (in
 default canonical mode).
 

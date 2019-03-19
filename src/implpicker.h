@@ -323,22 +323,16 @@ pick_implementation(int ksize, bool s_strand, unsigned max_mbp, unsigned max_gb,
             return make_instance('l', big_kmer, big_count, ksize, s_strand, max_count, n_threads);
         }
         else if (sz_vec < sz_lst) {
-            if (sz_vec < max_mb) {
-                verbose_emit("vector implementation (%luMB) smaller than list (%luMB)", sz_vec, sz_lst);
-                return make_instance('v', big_kmer, big_count, ksize, s_strand, max_count, n_threads);
-            }
-            else {
-                raise_error("no implementation can count %uM k-mers in %uGB memory", max_mbp, max_gb);
-                return 0;
-            }
-        }
-        else if (sz_lst < max_mb) {
-            verbose_emit("list implementation (%luMB) smaller than vector (%luMB)", sz_lst, sz_vec);
-            return make_instance('l', big_kmer, big_count, ksize, s_strand, max_count, n_threads);
+            verbose_emit("vector implementation (%luMB) smaller than list (%luMB)", sz_vec, sz_lst);
+            if (sz_vec > max_mb)
+                emit("expect trashing: insufficient physical memory (%luMB)", max_mb);
+            return make_instance('v', big_kmer, big_count, ksize, s_strand, max_count, n_threads);
         }
         else {
-            raise_error("no implementation can count %uM k-mers in %uGB memory", max_mbp, max_gb);
-            return 0;
+            verbose_emit("list implementation (%luMB) smaller than vector (%luMB)", sz_lst, sz_vec);
+            if (sz_lst > max_mb)
+                emit("expect trashing: insufficient physical memory (%luMB)", max_mb);
+            return make_instance('l', big_kmer, big_count, ksize, s_strand, max_count, n_threads);
         }
     }
     else { // we don't know the count size

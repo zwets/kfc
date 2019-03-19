@@ -36,9 +36,10 @@ USER_HEADERS = \
 	$(USER_DIR)/kmerencoder.h \
 	$(USER_DIR)/tallyman.h \
 	$(USER_DIR)/kmercounter.h \
-	#$(USER_DIR)/implpicker.h \
+	$(USER_DIR)/implpicker.h \
 
 USER_OBJS = \
+	kmercounter.o \
 	kmerencoder.o \
 	seqreader.o \
 	utils.o
@@ -57,7 +58,7 @@ TEST_OBJS = \
 	kmerencoder-test.o \
 	tallyman-test.o \
 	kmercounter-test.o \
-	#implpicker-test.o \
+	implpicker-test.o \
 
 # Build targets.
 

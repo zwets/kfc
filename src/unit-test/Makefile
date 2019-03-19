@@ -28,15 +28,15 @@ GTEST_HEADERS = $(GTEST_DIR)/include/gtest/*.h \
 TARGET = run-all-tests
 
 USER_HEADERS = \
+	$(USER_DIR)/utils.h \
+	$(USER_DIR)/seqreader.h \
 	$(USER_DIR)/bitfiddle.h \
 	$(USER_DIR)/basecodec.h \
 	$(USER_DIR)/kmercodec.h \
 	$(USER_DIR)/kmerencoder.h \
 	$(USER_DIR)/tallyman.h \
-	$(USER_DIR)/seqreader.h \
-	$(USER_DIR)/utils.h
+	$(USER_DIR)/kmercounter.h \
 	#$(USER_DIR)/implpicker.h \
-	#$(USER_DIR)/kmercounter.h \
 
 USER_OBJS = \
 	kmerencoder.o \
@@ -50,13 +50,14 @@ else
 endif
 
 TEST_OBJS = \
+	seqreader-test.o \
 	bitfiddle-test.o \
 	basecodec-test.o \
 	kmercodec-test.o \
 	kmerencoder-test.o \
-	seqreader-test.o \
 	tallyman-test.o \
-	#kmercounter-test.o \
+	kmercounter-test.o \
+	#implpicker-test.o \
 
 # Build targets.
 

@@ -17,6 +17,13 @@ else
   LIBS += -Wl,-Bstatic -lboost_iostreams -lz -Wl,-Bdynamic
 endif
 
+ifdef NO_THREADS
+  CXXFLAGS += -DNO_THREADS
+else
+  CXXFLAGS += -pthread
+  LIBS += -lpthread
+endif
+
 $(TARGET): $(OBJS) $(HDRS)
 	$(CXX) -o $(TARGET) $(OBJS) $(LIBS)
 

@@ -19,12 +19,35 @@
 #include <fstream>
 #include <iostream>
 #include <string>
-
+#ifndef NO_THREADS
+#  include <thread>
+#  include <mutex>
+#endif
 #include "implpicker.h"
 #include "seqreader.h"
 #include "utils.h"
 
 using namespace kfc;
+
+#ifndef NO_THREADS
+static void process_thread(sequence_reader* reader, kmer_counter* counter)
+{
+    static std::mutex read_mutex;
+    sequence seq;
+
+    while (true) 
+    {
+        std::unique_lock<std::mutex> read_lock(read_mutex);
+
+        if (!reader->next(seq))
+            break;
+        
+        read_lock.unlock();
+
+        counter->process(std::move(seq.data));
+    }
+}
+#endif
 
 static const int DEFAULT_KSIZE = 15;
 static const int MAX_KSIZE = 32;
@@ -43,6 +66,9 @@ static const char USAGE[] = "\n"
 "   -q        suppress output headers, just show k-mers and counts\n"
 "   -l MBASE  limit counting capacity to MBASE million bases (optimises speed)\n"
 "   -m MEMGB  constrain memory use to about MEM GB (default: all minus 2GB)\n"
+#ifndef NO_THREADS
+"   -t NUM    use NUM threads (default: all system threads)\n"
+#endif
 "   -x l|v|m  override the implementation choice to be list, vector, or map\n"
 "   -v        produce verbose output to stderr\n"
 "\n"
@@ -88,7 +114,9 @@ int main (int, char *argv[])
     unsigned max_mbp = 0.0;
     unsigned max_gb = 0;
     char force_impl = '\0';
+#ifndef NO_THREADS
     int n_threads = 0;
+#endif
     unsigned o_opts = output_opts::none;
 
     set_progname("kfc");
@@ -138,6 +166,14 @@ int main (int, char *argv[])
             if ((max_gb = std::atoi(*argv)) < 1)
                 raise_error("invalid memory size: %s", *argv);
         }
+        else if (opt == 't') {
+#ifndef NO_THREADS
+            if ((n_threads = std::atoi(*argv)) < 1)
+                raise_error("invalid number of threads: %s", *argv);
+#else
+            raise_error("not compiled with thread support");
+#endif
+        }
         else if (opt == 'x') {
             switch (force_impl = *argv[0]) {
                 case 'l': case 'v': case 'm': break;
@@ -152,6 +188,18 @@ int main (int, char *argv[])
 
     std::unique_ptr<kmer_counter> counter(pick_implementation(ksize, single_strand, max_mbp, max_gb, force_impl));
 
+#ifndef NO_THREADS
+    if (n_threads == 0) {
+        n_threads = get_system_threads();
+        verbose_emit("defaulting to %u system threads", n_threads);
+    }
+    else {
+        verbose_emit("using %u threads", n_threads);
+    }
+
+    std::vector<std::thread> threads;
+    threads.reserve(n_threads);
+#endif
         // Iterate over files
 
     std::string fname(*argv ? *argv++ : "-");
@@ -170,11 +218,30 @@ int main (int, char *argv[])
         }
 
         sequence_reader reader(*is);
+
+#ifndef NO_THREADS
+        if (n_threads > 1) {
+            verbose_emit("spawning %d threads", n_threads);
+            for (int i = 0; i < n_threads; ++i)
+                threads.push_back(std::thread(&process_thread, &reader, counter.get()));
+
+            for (int i = 0; i < n_threads; ++i)
+                threads[i].join();
+
+            threads.clear();
+        }
+        else {
+            sequence seq;
+
+            while (reader.next(seq))
+                counter->process(std::move(seq.data));
+        }
+#else
         sequence seq;
 
         while (reader.next(seq))
             counter->process(std::move(seq.data));
-
+#endif
         in_file.close();
 
         fname = *argv ? *argv++ : "";

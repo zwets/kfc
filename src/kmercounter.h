@@ -22,6 +22,9 @@
 #include <ostream>
 #include <memory>
 #include <algorithm>
+#ifndef NO_THREADS
+#  include <mutex>
+#endif
 #include "tallyman.h"
 #include "kmerencoder.h"
 
@@ -303,7 +306,6 @@ kmer_counter_list<kmer_t>::kmer_counter_list(int ksize, bool s_strand, size_t ma
     if (ksize > max_ksize)
         raise_error("k-mer size %d too large for this impl (max %d)", ksize, max_ksize);
 
-    //kmers_ = (kmer_t*) malloc(max_count * sizeof(kmer_t));
     kmers_ = ::new kmer_t[max_count];
 
     if (kmers_) {
@@ -319,7 +321,6 @@ template <typename kmer_t>
 kmer_counter_list<kmer_t>::~kmer_counter_list()
 { 
     if (kmers_) 
-    //    free (kmers_);
         delete [] kmers_;
 }
 
@@ -333,12 +334,21 @@ kmer_counter_list<kmer_t>::process(const std::string& data)
     else
         return;
 
+#ifndef NO_THREADS
+    // lock other threads while updating instance pointers
+    static std::mutex mutex;
+    std::unique_lock<std::mutex> lock(mutex);
+#endif
+
     kmer_t *new_pcur = pkmers_cur_ + len;
 
     if (new_pcur <= pkmers_end_) {
-        // first bump the pcur, so later next thread can enter before encode
         kmer_t *encode_ptr = pkmers_cur_;
         pkmers_cur_ = new_pcur;
+#ifndef NO_THREADS
+        // all pointers consistent, release before entering encoder
+        lock.unlock();
+#endif
         encoder_.encode(data, encode_ptr);
     }
     else

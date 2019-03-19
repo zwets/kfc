@@ -23,6 +23,9 @@
 #include <vector>
 #include <cstring>
 #include <map>
+#ifndef NO_THREADS
+#  include <mutex>
+#endif
 #include "utils.h"
 
 namespace kfc {
@@ -95,7 +98,9 @@ class tallyman_vec : public tallyman<value_t,count_t>
 
     private:
         count_t *vec_;
-
+#ifndef NO_THREADS
+        std::mutex tally_mutex_;
+#endif
         void tally(value_t i);
 
     public:
@@ -124,7 +129,9 @@ class tallyman_map : public tallyman<value_t,count_t>
     private:
         typedef typename std::map<value_t,count_t>::iterator iterator;
         std::map<value_t,count_t> map_;
-
+#ifndef NO_THREADS
+        std::mutex tally_mutex_;
+#endif
         void tally(value_t i);
 
     public:
@@ -189,6 +196,9 @@ template<typename value_t, typename count_t>
 inline void
 tallyman_vec<value_t,count_t>::tally(std::vector<value_t> &&ii)
 {
+#ifndef NO_THREADS
+    std::unique_lock<std::mutex> tally_lock(tally_mutex_);
+#endif
     for (auto i : ii)
         tally(i);
 }
@@ -197,6 +207,9 @@ template<typename value_t, typename count_t>
 inline void
 tallyman_vec<value_t,count_t>::tally(const std::vector<value_t>& ii)
 {
+#ifndef NO_THREADS
+    std::unique_lock<std::mutex> tally_lock(tally_mutex_);
+#endif
     for (auto i : ii)
         tally(i);
 }
@@ -229,16 +242,22 @@ tallyman_map<value_t,count_t>::tally(value_t i)
 
 template<typename value_t, typename count_t>
 inline void
-tallyman_map<value_t,count_t>::tally(std::vector<value_t> &&ii)
+tallyman_map<value_t,count_t>::tally(const std::vector<value_t>& ii)
 {
+#ifndef NO_THREADS
+    std::unique_lock<std::mutex> tally_lock(tally_mutex_);
+#endif
     for (auto i : ii)
         tally(i);
 }
 
 template<typename value_t, typename count_t>
 inline void
-tallyman_map<value_t,count_t>::tally(const std::vector<value_t>& ii)
+tallyman_map<value_t,count_t>::tally(std::vector<value_t> &&ii)
 {
+#ifndef NO_THREADS
+    std::unique_lock<std::mutex> tally_lock(tally_mutex_);
+#endif
     for (auto i : ii)
         tally(i);
 }

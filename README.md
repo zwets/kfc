@@ -12,15 +12,18 @@ GitHub, here are the steps to run it:
 
 * Requirements
 
-  To build `kcst` you need a C++ compiler and GNU `make`.  Run `c++ --version`
+  - To build `kfc` you need a C++ compiler and GNU `make`.  Run `c++ --version`
   and `make --version` to check that you have these.
 
-  Support for gzipped files requires Boost Iostreams, available on Debian
-  and Ubuntu as the `libboost-iostreams-dev` package.
+  - Built-in support for gzipped files requires Boost Iostreams, available on
+  Debian/Ubuntu as the `libboost-iostreams-dev` package.  Note though that
+  until `kfc` is multi-threaded, using the shell's inherent parallelism is
+  naturally more efficient: `gunzip -c file.fa.gz | kfc`.
+
 
 * Build
 
-      # Compile the khc source code
+      # Compile the kfc source code
       cd src
       make
 
@@ -29,7 +32,7 @@ GitHub, here are the steps to run it:
 
 * Install
 
-  There is no need to install `khc` in a specific place, but you may want to
+  There is no need to install `kfc` in a specific place, but you may want to
   add it to the path:
 
       # For convenience in the examples below, put kfc on the path
@@ -53,7 +56,7 @@ GitHub, here are the steps to run it:
 
 ## FAQ
 
-#### What are canonical (destranded) k-mers?
+#### What are canonical (double-stranded) k-mers?
 
 By default, `kfc` treats k-mers and their reverse complement as the same k-mer.
 For instance, if 3-mers `tgc` and `gca` both occur in the input, then they are
@@ -70,15 +73,13 @@ we're explicitly dealing with single-stranded DNA):
 
 Clearly, `tgc` and `gca` refer to the same base pair sequence, and the choice
 of name (`gca` or `tgc`) is arbitrary.  `kfc` simply picks whichever of the
-two has *a* or *c* as its middle base.  It calls this the 'canonical' k-mer.
-The requirement that k be odd guarantees that there ís a middle base.
+two has *a* or *c* as its middle base, and calls the the 'canonical' kmer.
+The requirement that k is odd guarantees that there ís a middle base.
 
 If you do not want this 'destranded' behaviour, use option `-s` to treat the
 input as single stranded DNA.  In this mode, only the k-mers which are
 literally seen in the input are reported.  Note that this makes the k-mer
-space twice as large, since the middle base can take on twice as many values.
-(In fact, in this mode there needn't even be a middle base, and k may be odd
-or even.)
+space twice as large as in the default mode.  In this mode k need not be odd.
 
 
 #### What are k-mer numbers (s-code, c-code)?
@@ -87,7 +88,10 @@ or even.)
 kfc calls this number an s-code (when in single stranded mode), or c-code (in
 default canonical mode).
 
-@@TODO@@
+The s-code is the unsigned integral number obtained by encoding each base of
+the k-mer as two bits (a = 00, c = 01, g = 10, t = 11).  The c-code is the
+same except that the middle base (which must be a=00 or c=01, see above) is
+encoded as a single bit.
 
 
 ---
